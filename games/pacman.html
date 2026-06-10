@@ -205,7 +205,7 @@ function draw(){
     ctx.fillStyle='#003';ctx.beginPath();ctx.arc(gp.x-r*0.35+g.dir.x*r*0.1,gp.y-r*0.1+g.dir.y*r*0.1,r*0.11,0,7);ctx.arc(gp.x+r*0.35+g.dir.x*r*0.1,gp.y-r*0.1+g.dir.y*r*0.1,r*0.11,0,7);ctx.fill();
   }
 }
-function loop(){if(state==='play')update();if(cells)draw();requestAnimationFrame(loop);}
+function loop(){if(state==='play')update();if(cells&&pac)draw();requestAnimationFrame(loop);}
 genMaze();dots=Array.from({length:N},()=>Array(N).fill(0));state='menu';
 requestAnimationFrame(loop);
 </script>

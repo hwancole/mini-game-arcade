@@ -2,6 +2,10 @@
 html,body{ overscroll-behavior:none; }
 body{ -webkit-tap-highlight-color:transparent; }
 
+/* 모바일 버튼 터치감: 더블탭 확대 방지 + 눌림 피드백 */
+button, .btn, .mode, .opt, .diff, .d{ touch-action:manipulation; }
+.btn:active{ transform:scale(.96); }
+
 /* 캔버스는 화면 폭에 맞춰 비율 유지 축소 */
 canvas{ max-width:100%; height:auto; touch-action:none; }
 
@@ -20,7 +24,7 @@ canvas{ max-width:100%; height:auto; touch-action:none; }
   pointer-events:none;
 }
 body.tc-on #tc-bar{ display:flex; }
-body.tc-on{ padding-bottom:140px; }   /* 컨트롤 바가 콘텐츠를 가리지 않도록 */
+body.tc-on{ padding-bottom:124px; }   /* 컨트롤 바가 콘텐츠를 가리지 않도록 */
 
 .tc-cluster{ display:flex; gap:10px; align-items:center; pointer-events:auto; flex-wrap:wrap; max-width:46%; }
 .tc-cluster.right{ justify-content:flex-end; }
