@@ -1,0 +1,51 @@
+/* ===== 공통 모바일/반응형 자산 (모든 게임 공유) ===== */
+html,body{ overscroll-behavior:none; }
+body{ -webkit-tap-highlight-color:transparent; }
+
+/* 캔버스는 화면 폭에 맞춰 비율 유지 축소 */
+canvas{ max-width:100%; height:auto; touch-action:none; }
+
+/* 게임 영역이 좁은 화면에서 넘치지 않도록 */
+#wrap, .board, #board, .game{ max-width:100%; }
+
+/* 상단 바 안전영역 + 줄바꿈 */
+.topbar{ flex-wrap:wrap; gap:6px; padding-top:max(10px,env(safe-area-inset-top)); }
+
+/* ===== 터치 컨트롤 바 ===== */
+#tc-bar{
+  display:none;
+  position:fixed; left:0; right:0; bottom:0; z-index:9000;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  justify-content:space-between; align-items:flex-end; gap:14px;
+  pointer-events:none;
+}
+body.tc-on #tc-bar{ display:flex; }
+body.tc-on{ padding-bottom:140px; }   /* 컨트롤 바가 콘텐츠를 가리지 않도록 */
+
+.tc-cluster{ display:flex; gap:10px; align-items:center; pointer-events:auto; flex-wrap:wrap; max-width:46%; }
+.tc-cluster.right{ justify-content:flex-end; }
+
+.tc-btn{
+  -webkit-user-select:none; user-select:none; touch-action:none;
+  display:flex; align-items:center; justify-content:center;
+  min-width:58px; height:58px; padding:0 14px;
+  border-radius:50%; font-size:1.4rem; font-weight:800;
+  background:rgba(255,255,255,.14); color:#fff;
+  border:2px solid rgba(255,255,255,.35);
+  box-shadow:0 4px 14px rgba(0,0,0,.45); backdrop-filter:blur(4px);
+  transition:transform .06s, background .1s;
+}
+.tc-btn.wide{ border-radius:30px; min-width:84px; font-size:1rem; }
+.tc-btn.big{ min-width:74px; height:74px; font-size:1.7rem; }
+.tc-btn:active, .tc-btn.pressed{ transform:scale(.9); background:rgba(255,255,255,.32); }
+.tc-btn .lbl{ font-size:.6rem; font-weight:700; opacity:.8; margin-left:4px; }
+
+/* 십자 D-패드 */
+.tc-dpad{ display:grid; grid-template-columns:repeat(3,52px); grid-template-rows:repeat(3,52px); gap:4px; pointer-events:auto; }
+.tc-dpad .tc-btn{ min-width:52px; height:52px; border-radius:14px; font-size:1.2rem; }
+.tc-dpad .up{ grid-area:1/2 } .tc-dpad .left{ grid-area:2/1 } .tc-dpad .right{ grid-area:2/3 } .tc-dpad .down{ grid-area:3/2 } .tc-dpad .mid{ grid-area:2/2; visibility:hidden }
+
+@media (min-width:760px) and (hover:hover){
+  body.tc-on{ padding-bottom:0; }
+  body.tc-on #tc-bar{ display:none; }   /* 데스크톱(마우스)에서는 숨김 */
+}

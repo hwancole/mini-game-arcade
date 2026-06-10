@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💣 지뢰찾기</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#1a1525;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;padding-bottom:30px}
+  .topbar{width:100%;max-width:700px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#c46fff;text-decoration:none;font-weight:bold}
+  h1{font-size:1.3rem;margin:10px}
+  .controls{display:flex;gap:10px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .diff{padding:8px 16px;border:2px solid #444;border-radius:8px;cursor:pointer;background:none;color:#eee;font-weight:bold;transition:.15s}
+  .diff.sel{border-color:#c46fff;background:rgba(196,111,255,.18)}
+  .diff:hover{border-color:#c46fff}
+  .stats{display:flex;gap:24px;margin:12px;font-size:1.4rem;font-weight:bold;align-items:center}
+  .stats .face{font-size:2rem;cursor:pointer;user-select:none}
+  #board{display:grid;gap:2px;background:#2a2435;padding:8px;border-radius:8px;user-select:none;touch-action:manipulation}
+  .cell{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+    font-weight:bold;font-size:1rem;cursor:pointer;border-radius:3px;background:#46395e;transition:background .1s}
+  .cell.hidden:hover{background:#564a72}
+  .cell.open{background:#2e2840;cursor:default}
+  .cell.mine{background:#ff5f6d}
+  .cell.flag{background:#3a3050}
+  .cell.wrong{background:#a04;}
+  .c1{color:#5f9fff}.c2{color:#5fffbc}.c3{color:#ff7b7b}.c4{color:#c46fff}
+  .c5{color:#ffc371}.c6{color:#5fd0ff}.c7{color:#fff}.c8{color:#aaa}
+  .msg{margin:14px;font-size:1.2rem;font-weight:bold;height:28px}
+  .hint{color:#9aa;font-size:.85rem;margin-top:10px;text-align:center}
+  .best{font-size:.85rem;color:#c9a0ff}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>💣 지뢰찾기</b><span></span></div>
+<div class="controls">
+  <button class="diff sel" data-d="easy">초급 9×9 · 10</button>
+  <button class="diff" data-d="medium">중급 16×16 · 40</button>
+  <button class="diff" data-d="hard">고급 16×30 · 99</button>
+</div>
+<div class="stats">
+  <span>💣 <span id="mineCount">10</span></span>
+  <span class="face" id="face" title="새 게임">🙂</span>
+  <span>⏱️ <span id="timer">0</span></span>
+</div>
+<div id="board"></div>
+<div class="msg" id="msg"></div>
+<div class="best" id="best"></div>
+<p class="hint">좌클릭: 열기 · 우클릭: 깃발 · 숫자 칸을 양클릭(또는 이미 연 칸 클릭)하면 주변 자동 열기<br>첫 클릭은 항상 안전합니다.</p>
+
+<script>
+const DIFFS={easy:{r:9,c:9,m:10},medium:{r:16,c:16,m:40},hard:{r:16,c:30,m:99}};
+let diff='easy', rows,cols,mines, grid, opened, flagged, state, firstClick, timer, timerIv, flagsLeft;
+let flagMode=false; // 모바일: 탭으로 깃발 토글
+const boardEl=document.getElementById('board'),faceEl=document.getElementById('face'),
+      msgEl=document.getElementById('msg'),mineCountEl=document.getElementById('mineCount'),
+      timerEl=document.getElementById('timer'),bestEl=document.getElementById('best');
+
+document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.diff').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');diff=b.dataset.d;newGame();
+});
+faceEl.onclick=newGame;
+
+function newGame(){
+  const d=DIFFS[diff];rows=d.r;cols=d.c;mines=d.m;
+  grid=Array.from({length:rows},()=>Array(cols).fill(0)); // -1 mine else count
+  opened=Array.from({length:rows},()=>Array(cols).fill(false));
+  flagged=Array.from({length:rows},()=>Array(cols).fill(false));
+  state='ready';firstClick=true;flagsLeft=mines;
+  clearInterval(timerIv);timer=0;timerEl.textContent='0';
+  mineCountEl.textContent=mines;faceEl.textContent='🙂';msgEl.textContent='';
+  showBest();render();
+}
+
+function placeMines(sr,sc){
+  let placed=0;
+  const safe=new Set();
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const r=sr+dr,c=sc+dc;if(r>=0&&r<rows&&c>=0&&c<cols)safe.add(r*cols+c);}
+  while(placed<mines){
+    const r=Math.floor(Math.random()*rows),c=Math.floor(Math.random()*cols);
+    if(grid[r][c]===-1||safe.has(r*cols+c))continue;
+    grid[r][c]=-1;placed++;
+  }
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    if(grid[r][c]===-1)continue;let n=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&grid[nr][nc]===-1)n++;}
+    grid[r][c]=n;
+  }
+}
+
+function startTimer(){timerIv=setInterval(()=>{timer++;timerEl.textContent=timer;},1000);}
+
+function open(r,c){
+  if(opened[r][c]||flagged[r][c]||state==='lost'||state==='won')return;
+  if(firstClick){placeMines(r,c);firstClick=false;state='playing';startTimer();}
+  opened[r][c]=true;
+  if(grid[r][c]===-1){lose(r,c);return;}
+  if(grid[r][c]===0){
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&!opened[nr][nc])open(nr,nc);
+    }
+  }
+}
+
+function chord(r,c){
+  if(!opened[r][c]||grid[r][c]<=0)return;
+  let f=0;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&flagged[nr][nc])f++;}
+  if(f===grid[r][c]){
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&!flagged[nr][nc])open(nr,nc);}
+  }
+}
+
+function toggleFlag(r,c){
+  if(opened[r][c]||state==='lost'||state==='won')return;
+  if(firstClick)return;
+  flagged[r][c]=!flagged[r][c];
+  flagsLeft+=flagged[r][c]?-1:1;mineCountEl.textContent=flagsLeft;
+}
+
+let lastR=-1,lastC=-1;
+function lose(mr,mc){
+  lastR=mr;lastC=mc; // highlight the mine that was clicked
+  state='lost';clearInterval(timerIv);faceEl.textContent='😵';
+  msgEl.style.color='#ff5f6d';msgEl.textContent='💥 펑! 게임 오버';
+  render();
+}
+function checkWin(){
+  let unopened=0;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(!opened[r][c]&&grid[r][c]!==-1)unopened++;
+  if(unopened===0){
+    state='won';clearInterval(timerIv);faceEl.textContent='😎';
+    msgEl.style.color='#5fffbc';msgEl.textContent='🎉 클리어! '+timer+'초';
+    flagsLeft=0;mineCountEl.textContent=0;
+    saveBest();
+  }
+}
+
+function bestKey(){return 'mines_best_'+diff;}
+function saveBest(){const k=bestKey(),prev=parseInt(localStorage.getItem(k)||'0');if(!prev||timer<prev){localStorage.setItem(k,timer);}showBest();}
+function showBest(){const v=localStorage.getItem(bestKey());bestEl.textContent=v?`🏆 ${diff} 최고 기록: ${v}초`:'';}
+
+function render(){
+  boardEl.style.gridTemplateColumns=`repeat(${cols},30px)`;
+  boardEl.innerHTML='';
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const d=document.createElement('div');d.className='cell';
+    if(opened[r][c]){
+      d.classList.add('open');
+      if(grid[r][c]===-1){d.classList.add('mine');d.textContent='💣';if(r===lastR&&c===lastC)d.classList.add('wrong');}
+      else if(grid[r][c]>0){d.textContent=grid[r][c];d.classList.add('c'+grid[r][c]);}
+    } else {
+      d.classList.add('hidden');
+      if(flagged[r][c]){d.classList.add('flag');d.textContent='🚩';}
+      if((state==='lost')&&grid[r][c]===-1&&!flagged[r][c]){d.classList.remove('hidden');d.classList.add('open','mine');d.textContent='💣';}
+      if((state==='lost')&&flagged[r][c]&&grid[r][c]!==-1){d.textContent='❌';}
+    }
+    d.oncontextmenu=e=>{e.preventDefault();toggleFlag(r,c);postAction();};
+    d.onmousedown=e=>{
+      if(state==='lost'||state==='won')return;
+      if(e.button===0){
+        if(flagMode && !opened[r][c]){toggleFlag(r,c);postAction();return;}
+        if(opened[r][c]&&grid[r][c]>0)chord(r,c);
+        else open(r,c);
+        postAction();
+      }
+    };
+    boardEl.appendChild(d);
+  }
+}
+function postAction(){checkWin();render();}
+
+newGame();
+
+// 모바일용 깃발 모드 토글 버튼
+(function(){
+  const touch=window.matchMedia('(hover:none) and (pointer:coarse)').matches || 'ontouchstart' in window;
+  if(!touch)return; // 데스크톱은 우클릭으로 깃발
+  const btn=document.createElement('button');
+  btn.textContent='🚩 깃발 모드: OFF';
+  btn.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:9000;padding:12px 24px;border-radius:30px;border:2px solid #c46fff;background:#2a2435;color:#fff;font-weight:bold;font-size:1rem;box-shadow:0 4px 14px rgba(0,0,0,.5)';
+  btn.onclick=()=>{flagMode=!flagMode;btn.textContent='🚩 깃발 모드: '+(flagMode?'ON':'OFF');btn.style.background=flagMode?'#c46fff':'#2a2435';btn.style.color=flagMode?'#1a1525':'#fff';};
+  document.body.appendChild(btn);
+  document.body.style.paddingBottom='80px';
+})();
+</script>
+</body>
+</html>

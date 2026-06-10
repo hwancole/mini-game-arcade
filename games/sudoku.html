@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>✏️ 스도쿠</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0c1422;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5f9fff;text-decoration:none;font-weight:bold}
+  h1{margin:4px;color:#5f9fff;font-size:1.4rem}
+  .controls{display:flex;gap:8px;margin:6px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:7px 13px;border:2px solid #555;border-radius:8px;cursor:pointer;color:#eee;background:none;font-weight:bold;font-size:.9rem}
+  .opt.sel{border-color:#5f9fff;background:rgba(95,159,255,.18)}
+  .stats{display:flex;gap:16px;margin:6px;font-size:1rem;font-weight:bold}
+  #grid{display:grid;grid-template-columns:repeat(9,1fr);width:min(94vw,460px);aspect-ratio:1;
+    background:#5f9fff;border:3px solid #5f9fff;border-radius:6px;margin:8px;gap:1px}
+  .cell{background:#16233a;display:flex;align-items:center;justify-content:center;
+    font-size:clamp(1rem,5vw,1.6rem);font-weight:600;cursor:pointer;position:relative;aspect-ratio:1}
+  .cell.given{color:#cde3ff;font-weight:800;background:#1b2a45}
+  .cell.user{color:#5fffac}
+  .cell.sel{background:#2e4a78!important}
+  .cell.peer{background:#1d2d49}
+  .cell.same{background:#2a3f63}
+  .cell.err{color:#ff6b6b!important}
+  .cell:nth-child(9n+3),.cell:nth-child(9n+6){margin-right:2px}
+  .cell.br{box-shadow:inset 0 -2px 0 #5f9fff}
+  .cell .notes{position:absolute;inset:1px;display:grid;grid-template-columns:repeat(3,1fr);font-size:.5rem;color:#7a90b5;font-weight:500}
+  .cell .notes span{display:flex;align-items:center;justify-content:center}
+  .pad{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:min(94vw,460px);margin:8px}
+  .pad button{padding:14px 0;font-size:1.3rem;font-weight:bold;border:none;border-radius:10px;
+    background:#1d2d49;color:#cde;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .pad button:active{background:#2e4a78}
+  .pad .act{background:#243a5e;font-size:.95rem}
+  .pad .act.on{background:#5f9fff;color:#04121f}
+  .actions{display:flex;gap:8px;margin:6px}
+  .btn{background:#5f9fff;color:#04121f;border:none;padding:10px 20px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(6,10,18,.92);text-align:center;gap:14px;z-index:10}
+  .overlay.hidden{display:none}.overlay h2{color:#5fffac;font-size:2rem}
+  .hint{color:#9aa;font-size:.8rem;text-align:center}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>✏️ 스도쿠</b><span></span></div>
+<h1>스도쿠</h1>
+<div class="controls">
+  <button class="opt sel" data-d="easy">쉬움</button>
+  <button class="opt" data-d="normal">보통</button>
+  <button class="opt" data-d="hard">어려움</button>
+  <button class="opt" id="newBtn" style="border-color:#5fffac;color:#5fffac">새 퍼즐</button>
+</div>
+<div class="stats"><span>⏱️ <span id="time">0</span>s</span><span>❌ <span id="errs">0</span></span><span>💡 <span id="hints">3</span></span></div>
+<div id="grid"></div>
+<div class="pad" id="pad"></div>
+
+<div class="overlay hidden" id="winScreen"><h2>🎉 완성!</h2><p id="winStats"></p><button class="btn" id="winBtn">새 퍼즐</button></div>
+<p class="hint">칸을 선택하고 숫자를 입력하세요 · ✏️ 메모 모드로 후보 표시 · 💡 힌트는 제한적</p>
+
+<script>
+const gridEl=document.getElementById('grid'),padEl=document.getElementById('pad');
+const timeEl=document.getElementById('time'),errsEl=document.getElementById('errs'),hintsEl=document.getElementById('hints');
+let solution,puzzle,given,notes,sel=-1,diff='easy',noteMode=false,errs,hints,timer,timerIv,cells=[];
+
+function newSolved(){
+  const g=Array.from({length:9},()=>Array(9).fill(0));
+  function ok(r,c,n){
+    for(let i=0;i<9;i++)if(g[r][i]===n||g[i][c]===n)return false;
+    const br=r-r%3,bc=c-c%3;
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(g[br+i][bc+j]===n)return false;
+    return true;
+  }
+  function fill(p){
+    if(p===81)return true;
+    const r=Math.floor(p/9),c=p%9;
+    const nums=[1,2,3,4,5,6,7,8,9];
+    for(let i=nums.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[nums[i],nums[j]]=[nums[j],nums[i]];}
+    for(const n of nums){if(ok(r,c,n)){g[r][c]=n;if(fill(p+1))return true;g[r][c]=0;}}
+    return false;
+  }
+  fill(0);return g;
+}
+function countSolutions(grid,limit){
+  // backtracking count up to limit
+  let cnt=0;
+  function ok(r,c,n){for(let i=0;i<9;i++)if(grid[r][i]===n||grid[i][c]===n)return false;const br=r-r%3,bc=c-c%3;for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(grid[br+i][bc+j]===n)return false;return true;}
+  function sol(){
+    for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(grid[r][c]===0){
+      for(let n=1;n<=9;n++)if(ok(r,c,n)){grid[r][c]=n;sol();grid[r][c]=0;if(cnt>=limit)return;}
+      return;
+    }
+    cnt++;
+  }
+  sol();return cnt;
+}
+function makePuzzle(){
+  solution=newSolved();
+  puzzle=solution.map(r=>[...r]);
+  const holes={easy:38,normal:46,hard:50}[diff];
+  const order=[...Array(81).keys()];
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];}
+  let removed=0;
+  for(const idx of order){
+    if(removed>=holes)break;
+    const r=Math.floor(idx/9),c=idx%9;if(puzzle[r][c]===0)continue;
+    const bak=puzzle[r][c];puzzle[r][c]=0;
+    const copy=puzzle.map(x=>[...x]);
+    if(countSolutions(copy,2)!==1){puzzle[r][c]=bak;} else removed++;
+  }
+  given=puzzle.map(r=>r.map(v=>v!==0));
+  notes=Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
+}
+function newGame(){
+  makePuzzle();sel=-1;errs=0;hints=3;noteMode=false;
+  errsEl.textContent=0;hintsEl.textContent=3;
+  clearInterval(timerIv);timer=0;timeEl.textContent=0;timerIv=setInterval(()=>{timer++;timeEl.textContent=timer;},1000);
+  document.getElementById('winScreen').classList.add('hidden');
+  buildGrid();updatePad();render();
+}
+function buildGrid(){
+  gridEl.innerHTML='';cells=[];
+  for(let i=0;i<81;i++){
+    const r=Math.floor(i/9),c=i%9;
+    const d=document.createElement('div');d.className='cell';
+    if((r+1)%3===0&&r!==8)d.classList.add('br');
+    d.onclick=()=>{sel=i;render();};
+    gridEl.appendChild(d);cells.push(d);
+  }
+}
+function updatePad(){
+  padEl.innerHTML='';
+  for(let n=1;n<=9;n++){const b=document.createElement('button');b.textContent=n;b.onclick=()=>input(n);padEl.appendChild(b);}
+  const erase=document.createElement('button');erase.className='act';erase.textContent='지움';erase.onclick=()=>input(0);padEl.appendChild(erase);
+  const note=document.createElement('button');note.className='act';note.id='noteBtn';note.textContent='✏️ 메모';note.onclick=()=>{noteMode=!noteMode;note.classList.toggle('on',noteMode);};padEl.appendChild(note);
+  const hint=document.createElement('button');hint.className='act';hint.textContent='💡 힌트';hint.onclick=useHint;padEl.appendChild(hint);
+  // pad row 2 has 5 slots: erase,note,hint + 2 empty -> add spacers
+  const undo=document.createElement('button');undo.className='act';undo.textContent='✔ 체크';undo.onclick=checkErrors;padEl.appendChild(undo);
+  const blank=document.createElement('button');blank.className='act';blank.style.visibility='hidden';padEl.appendChild(blank);
+}
+function input(n){
+  if(sel<0)return;const r=Math.floor(sel/9),c=sel%9;
+  if(given[r][c])return;
+  if(noteMode&&n!==0){if(notes[r][c].has(n))notes[r][c].delete(n);else notes[r][c].add(n);render();return;}
+  if(n===0){puzzle[r][c]=0;render();return;}
+  puzzle[r][c]=n;notes[r][c].clear();
+  if(n!==solution[r][c]){errs++;errsEl.textContent=errs;}
+  render();checkWin();
+}
+function useHint(){
+  if(sel<0||hints<=0)return;const r=Math.floor(sel/9),c=sel%9;
+  if(given[r][c]||puzzle[r][c]===solution[r][c])return;
+  puzzle[r][c]=solution[r][c];given[r][c]=true;notes[r][c].clear();
+  hints--;hintsEl.textContent=hints;render();checkWin();
+}
+function checkErrors(){
+  for(let i=0;i<81;i++){const r=Math.floor(i/9),c=i%9;
+    if(!given[r][c]&&puzzle[r][c]&&puzzle[r][c]!==solution[r][c])cells[i].classList.add('err');}
+  setTimeout(render,900);
+}
+function render(){
+  const sr=sel>=0?Math.floor(sel/9):-1, sc=sel>=0?sel%9:-1;
+  const sv=sel>=0?puzzle[sr][sc]:0;
+  for(let i=0;i<81;i++){
+    const r=Math.floor(i/9),c=i%9,v=puzzle[r][c],cell=cells[i];
+    cell.className='cell'+((r+1)%3===0&&r!==8?' br':'');
+    if(given[r][c])cell.classList.add('given'); else if(v)cell.classList.add('user');
+    if(i===sel)cell.classList.add('sel');
+    else if(sr>=0&&(r===sr||c===sc||(Math.floor(r/3)===Math.floor(sr/3)&&Math.floor(c/3)===Math.floor(sc/3))))cell.classList.add('peer');
+    if(sv&&v===sv)cell.classList.add('same');
+    if(v&&!given[r][c]&&v!==solution[r][c])cell.classList.add('err');
+    if(v){cell.textContent=v;}
+    else if(notes[r][c].size){cell.textContent='';const nd=document.createElement('div');nd.className='notes';
+      for(let n=1;n<=9;n++){const s=document.createElement('span');s.textContent=notes[r][c].has(n)?n:'';nd.appendChild(s);}cell.appendChild(nd);}
+    else cell.textContent='';
+  }
+}
+function checkWin(){
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(puzzle[r][c]!==solution[r][c])return;
+  clearInterval(timerIv);
+  const key='sudoku_best_'+diff,prev=localStorage.getItem(key);let rec='';
+  if(!prev||timer<+prev){localStorage.setItem(key,timer);rec=' (신기록!)';}
+  document.getElementById('winStats').innerHTML=`시간 ${timer}초 · 실수 ${errs}회${rec}`;
+  document.getElementById('winScreen').classList.remove('hidden');
+}
+document.querySelectorAll('.opt[data-d]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-d]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');diff=o.dataset.d;newGame();});
+document.getElementById('newBtn').onclick=newGame;
+document.getElementById('winBtn').onclick=newGame;
+addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='9')input(+e.key);else if(e.key==='Backspace'||e.key==='0'||e.key==='Delete')input(0);
+  else if(sel>=0){if(e.key==='ArrowRight'&&sel%9<8){sel++;render();}else if(e.key==='ArrowLeft'&&sel%9>0){sel--;render();}
+  else if(e.key==='ArrowDown'&&sel<72){sel+=9;render();}else if(e.key==='ArrowUp'&&sel>8){sel-=9;render();}}});
+newGame();
+</script>
+</body>
+</html>

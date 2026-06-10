@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔴 사목 (Connect Four)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0a1020;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ffd35f;text-decoration:none;font-weight:bold}
+  h1{margin:6px;color:#ffd35f}
+  .controls{display:flex;gap:10px;margin:8px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:8px 16px;border:2px solid #444;border-radius:8px;cursor:pointer;background:none;color:#eee;font-weight:bold}
+  .opt.sel{border-color:#ffd35f;background:rgba(255,211,95,.18)}
+  #status{font-size:1.3rem;font-weight:bold;margin:10px;height:30px}
+  #wrap{position:relative}
+  canvas{display:block;cursor:pointer;border-radius:10px}
+  .btn{background:#ffd35f;color:#063;border:none;padding:10px 22px;border-radius:8px;font-weight:bold;cursor:pointer;margin:10px}
+  .hint{color:#9aa;font-size:.85rem;text-align:center}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🔴 사목</b><span></span></div>
+<h1>사목 (Connect Four)</h1>
+<div class="controls">
+  <button class="opt sel" data-m="ai">🤖 vs AI</button>
+  <button class="opt" data-m="2p">👥 2인 대전</button>
+</div>
+<div id="status">🔴 빨강 차례</div>
+<div id="wrap"><canvas id="cv" width="490" height="560"></canvas></div>
+<button class="btn" id="resetBtn">🔄 새 게임</button>
+<p class="hint">열을 클릭해 말을 떨어뜨리세요. 가로·세로·대각선으로 4개를 먼저 연결하면 승리!</p>
+
+<script>
+const COLS=7,ROWS=6,CELL=70,PAD=0;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const statusEl=document.getElementById('status');
+let board,turn,over,mode='ai',hoverCol=-1,winCells=[],anim=null;
+
+document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
+  document.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');mode=o.dataset.m;reset();});
+
+function reset(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  turn=1;over=false;winCells=[];anim=null;
+  statusEl.textContent='🔴 빨강 차례';statusEl.style.color='#ff5f6d';
+  draw();
+}
+document.getElementById('resetBtn').onclick=reset;
+
+function dropRow(c){for(let r=ROWS-1;r>=0;r--)if(!board[r][c])return r;return -1;}
+
+function place(c,player,cb){
+  const r=dropRow(c);if(r<0)return;
+  // animate drop
+  anim={c,r,player,y:-CELL,cb};
+}
+function settle(c,r,player){
+  board[r][c]=player;
+  const w=checkWin(r,c,player);
+  if(w){over=true;winCells=w;statusEl.textContent=(player===1?'🔴 빨강':'🟡 노랑')+' 승리! 🎉';statusEl.style.color=player===1?'#ff5f6d':'#ffd35f';return;}
+  if(board[0].every(v=>v)){over=true;statusEl.textContent='무승부!';statusEl.style.color='#aaa';return;}
+  turn=3-player;
+  statusEl.textContent=turn===1?'🔴 빨강 차례':'🟡 노랑 차례';
+  statusEl.style.color=turn===1?'#ff5f6d':'#ffd35f';
+  if(mode==='ai'&&turn===2&&!over)setTimeout(aiMove,400);
+}
+
+function checkWin(r,c,p){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const [dr,dc] of dirs){
+    let cells=[[r,c]];
+    for(const s of [1,-1]){
+      let nr=r+dr*s,nc=c+dc*s;
+      while(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===p){cells.push([nr,nc]);nr+=dr*s;nc+=dc*s;}
+    }
+    if(cells.length>=4)return cells;
+  }
+  return null;
+}
+
+// AI: minimax with limited depth
+function validCols(b){const v=[];for(let c=0;c<COLS;c++)if(!b[0][c])v.push(c);return v;}
+function dropRowB(b,c){for(let r=ROWS-1;r>=0;r--)if(!b[r][c])return r;return -1;}
+function winsAt(b,r,c,p){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const [dr,dc] of dirs){let n=1;
+    for(const s of[1,-1]){let nr=r+dr*s,nc=c+dc*s;while(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&b[nr][nc]===p){n++;nr+=dr*s;nc+=dc*s;}}
+    if(n>=4)return true;}
+  return false;
+}
+function scorePos(b){
+  // heuristic: count windows
+  let s=0;
+  const lines=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    for(const [dr,dc] of [[0,1],[1,0],[1,1],[1,-1]]){
+      const w=[];let ok=true;
+      for(let k=0;k<4;k++){const nr=r+dr*k,nc=c+dc*k;if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ok=false;break;}w.push(b[nr][nc]);}
+      if(ok)lines.push(w);
+    }
+  }
+  for(const w of lines){
+    const me=w.filter(v=>v===2).length,op=w.filter(v=>v===1).length;
+    if(me&&op)continue;
+    if(me===3)s+=50;else if(me===2)s+=10;else if(me===1)s+=1;
+    if(op===3)s-=80;else if(op===2)s-=12;else if(op===1)s-=1;
+  }
+  // center preference
+  for(let r=0;r<ROWS;r++)if(b[r][3]===2)s+=4;else if(b[r][3]===1)s-=4;
+  return s;
+}
+function minimax(b,depth,alpha,beta,maxing){
+  const valid=validCols(b);
+  if(depth===0||valid.length===0)return [scorePos(b),null];
+  let bestCol=valid[Math.floor(Math.random()*valid.length)];
+  if(maxing){
+    let val=-1e9;
+    for(const c of valid){const r=dropRowB(b,c);b[r][c]=2;
+      let sc;if(winsAt(b,r,c,2))sc=100000-depth;else sc=minimax(b,depth-1,alpha,beta,false)[0];
+      b[r][c]=0;if(sc>val){val=sc;bestCol=c;}alpha=Math.max(alpha,val);if(alpha>=beta)break;}
+    return [val,bestCol];
+  } else {
+    let val=1e9;
+    for(const c of valid){const r=dropRowB(b,c);b[r][c]=1;
+      let sc;if(winsAt(b,r,c,1))sc=-100000+depth;else sc=minimax(b,depth-1,alpha,beta,true)[0];
+      b[r][c]=0;if(sc<val){val=sc;bestCol=c;}beta=Math.min(beta,val);if(alpha>=beta)break;}
+    return [val,bestCol];
+  }
+}
+function aiMove(){
+  if(over)return;
+  const [,col]=minimax(board.map(r=>[...r]),5,-1e9,1e9,true);
+  if(col!=null)place(col,2);
+}
+
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();hoverCol=Math.floor((e.clientX-r.left)*(cv.width/r.width)/CELL);});
+cv.addEventListener('mouseleave',()=>{hoverCol=-1;});
+cv.addEventListener('click',e=>{
+  if(over||anim||(mode==='ai'&&turn===2))return;
+  const r=cv.getBoundingClientRect();const c=Math.floor((e.clientX-r.left)*(cv.width/r.width)/CELL);
+  if(c>=0&&c<COLS&&dropRow(c)>=0)place(c,turn);
+});
+
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // hover marker area (top)
+  if(hoverCol>=0&&hoverCol<COLS&&!over&&!anim&&!(mode==='ai'&&turn===2)&&dropRow(hoverCol)>=0){
+    ctx.fillStyle=turn===1?'rgba(255,95,109,.5)':'rgba(255,211,95,.5)';
+    ctx.beginPath();ctx.arc(hoverCol*CELL+CELL/2,CELL/2-30,CELL/2-8,0,7);ctx.fill();
+  }
+  // board (blue) starting below the top hover strip
+  const top=10;
+  ctx.fillStyle='#2255cc';
+  roundRect(0,top,cv.width,ROWS*CELL,14);ctx.fill();
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const x=c*CELL+CELL/2,y=top+r*CELL+CELL/2;
+    const v=board[r][c];
+    ctx.fillStyle=v===1?'#ff5f6d':v===2?'#ffd35f':'#0a1020';
+    ctx.beginPath();ctx.arc(x,y,CELL/2-7,0,7);ctx.fill();
+    if(v){ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.arc(x-6,y-6,CELL/6,0,7);ctx.fill();}
+    if(winCells.some(([wr,wc])=>wr===r&&wc===c)){ctx.strokeStyle='#5fffac';ctx.lineWidth=4;ctx.beginPath();ctx.arc(x,y,CELL/2-7,0,7);ctx.stroke();}
+  }
+  // animating piece
+  if(anim){
+    const x=anim.c*CELL+CELL/2;
+    ctx.fillStyle=anim.player===1?'#ff5f6d':'#ffd35f';
+    ctx.beginPath();ctx.arc(x,top+anim.y+CELL/2,CELL/2-7,0,7);ctx.fill();
+  }
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function loop(){
+  if(anim){
+    const targetY=anim.r*CELL;
+    anim.y+=Math.max(8,(targetY-anim.y)*0.25);
+    if(anim.y>=targetY){const {c,r,player}=anim;anim=null;settle(c,r,player);}
+  }
+  draw();requestAnimationFrame(loop);
+}
+reset();requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛸 스페이스 인베이더</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#05060f;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fffac;text-decoration:none;font-weight:bold}
+  .stats{display:flex;gap:24px;margin:6px;font-size:1.1rem;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#05060f;border:2px solid #1a2a4e;border-radius:8px;display:block}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(3,4,12,.92);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#5fffac}
+  .btn{background:#5fffac;color:#063;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🛸 스페이스 인베이더</b><span></span></div>
+<div class="stats"><span>⭐ <span id="score">0</span></span><span>❤️ <span id="lives">3</span></span><span>🌊 Wave <span id="wave">1</span></span><span>🏆 <span id="best">0</span></span></div>
+<div id="wrap">
+  <canvas id="cv" width="600" height="560"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>스페이스 인베이더</h2>
+    <p class="hint">외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요.</p>
+    <button class="btn" id="startBtn">시작 ▶</button>
+    <p class="hint"><kbd>←→</kbd> / <kbd>A D</kbd> 이동 · <kbd>Space</kbd> 발사</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle"></h2>
+    <p class="hint" id="endStats"></p>
+    <button class="btn" id="restartBtn">🔄 재시작</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives'),waveEl=document.getElementById('wave'),bestEl=document.getElementById('best');
+let ship,aliens,pBullets,eBullets,bunkers,ufo,score,lives,wave,state,dir,stepT,fireT,ufoT,particles;
+best=parseInt(localStorage.getItem('invaders_best')||'0');bestEl.textContent=best;
+const AC=['#ff5f6d','#ffd35f','#5fd0ff'];
+
+function buildWave(){
+  aliens=[];const rows=5,cols=10;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    aliens.push({x:60+c*46,y:60+r*38,w:30,h:22,row:r,alive:true,
+      color:AC[r<1?0:r<3?1:2],pts:(rows-r)*10});
+  }
+  dir=1;stepT=0;
+}
+function buildBunkers(){
+  bunkers=[];
+  for(let i=0;i<4;i++){
+    const bx=70+i*140;
+    const blocks=[];
+    for(let gx=0;gx<8;gx++)for(let gy=0;gy<5;gy++){
+      if(gy===4&&gx>1&&gx<6)continue; // arch
+      blocks.push({x:bx+gx*9,y:H-130+gy*9,hp:3});
+    }
+    bunkers.push(blocks);
+  }
+}
+function start(){
+  ship={x:W/2-18,y:H-50,w:36,h:18,cool:0};
+  pBullets=[];eBullets=[];particles=[];ufo=null;
+  score=0;lives=3;wave=1;ufoT=600+Math.random()*400;
+  scoreEl.textContent=0;livesEl.textContent=3;waveEl.textContent=1;
+  buildWave();buildBunkers();state='play';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+
+let keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+function fire(){if(ship.cool>0)return;ship.cool=18;pBullets.push({x:ship.x+ship.w/2,y:ship.y,vy:-8});}
+function boom(x,y,col){for(let i=0;i<10;i++){const a=Math.random()*7;particles.push({x,y,vx:Math.cos(a)*Math.random()*3,vy:Math.sin(a)*Math.random()*3,life:18,color:col});}}
+
+function hitBunker(x,y){
+  for(const b of bunkers)for(const blk of b){
+    if(blk.hp>0&&x>blk.x&&x<blk.x+9&&y>blk.y&&y<blk.y+9){blk.hp--;return true;}
+  }
+  return false;
+}
+
+function update(){
+  if(keys['arrowleft']||keys['a'])ship.x-=5;
+  if(keys['arrowright']||keys['d'])ship.x+=5;
+  ship.x=Math.max(6,Math.min(W-ship.w-6,ship.x));
+  if(keys[' '])fire();
+  if(ship.cool>0)ship.cool--;
+
+  // alien movement (step)
+  const alive=aliens.filter(a=>a.alive);
+  const speed=Math.max(8,46-alive.length*0.6-wave*2);
+  stepT++;
+  if(stepT>=speed){
+    stepT=0;
+    let edge=false;
+    for(const a of alive){if((dir>0&&a.x+a.w>W-12)||(dir<0&&a.x<12))edge=true;}
+    if(edge){dir*=-1;for(const a of alive)a.y+=16;}
+    else for(const a of alive)a.x+=dir*10;
+    // reached bottom?
+    for(const a of alive)if(a.y+a.h>=ship.y-6)return end(false);
+    // alien fire
+    if(alive.length&&Math.random()<0.6+wave*0.05){
+      const shooter=alive[Math.floor(Math.random()*alive.length)];
+      eBullets.push({x:shooter.x+shooter.w/2,y:shooter.y+shooter.h,vy:3+wave*0.3});
+    }
+  }
+  // UFO
+  ufoT--;
+  if(ufoT<=0&&!ufo){ufo={x:-40,y:34,w:38,h:16,pts:[50,100,150][Math.floor(Math.random()*3)]};ufoT=700+Math.random()*500;}
+  if(ufo){ufo.x+=2.2;if(ufo.x>W+40)ufo=null;}
+
+  // player bullets
+  for(const b of pBullets){
+    b.y+=b.vy;
+    if(hitBunker(b.x,b.y)){b.dead=true;continue;}
+    for(const a of alive){if(b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){a.alive=false;b.dead=true;score+=a.pts;boom(a.x+a.w/2,a.y+a.h/2,a.color);break;}}
+    if(ufo&&b.x>ufo.x&&b.x<ufo.x+ufo.w&&b.y>ufo.y&&b.y<ufo.y+ufo.h){score+=ufo.pts;boom(ufo.x+ufo.w/2,ufo.y,'#ff5fd0');ufo=null;b.dead=true;}
+  }
+  pBullets=pBullets.filter(b=>!b.dead&&b.y>-10);
+  // enemy bullets
+  for(const b of eBullets){
+    b.y+=b.vy;
+    if(hitBunker(b.x,b.y)){b.dead=true;continue;}
+    if(b.x>ship.x&&b.x<ship.x+ship.w&&b.y>ship.y&&b.y<ship.y+ship.h){
+      b.dead=true;lives--;livesEl.textContent=lives;boom(ship.x+ship.w/2,ship.y,'#5fffac');
+      if(lives<=0)return end(false);
+    }
+  }
+  eBullets=eBullets.filter(b=>!b.dead&&b.y<H+10);
+  scoreEl.textContent=score;
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life--;}
+  particles=particles.filter(p=>p.life>0);
+  if(score>best){best=score;localStorage.setItem('invaders_best',best);bestEl.textContent=best;}
+  // next wave
+  if(alive.length===0){wave++;waveEl.textContent=wave;buildWave();eBullets=[];}
+}
+function end(win){
+  state='over';
+  document.getElementById('endTitle').textContent=win?'🏆 승리!':'💀 게임 오버';
+  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+function drawAlien(a){
+  ctx.fillStyle=a.alive?a.color:'#333';
+  const x=a.x,y=a.y,w=a.w,h=a.h;
+  ctx.fillRect(x+6,y,w-12,h-8);
+  ctx.fillRect(x,y+6,w,h-12);
+  ctx.fillRect(x+2,y+h-6,6,6);ctx.fillRect(x+w-8,y+h-6,6,6);
+  ctx.fillStyle='#05060f';ctx.fillRect(x+9,y+6,5,5);ctx.fillRect(x+w-14,y+6,5,5);
+}
+function draw(){
+  ctx.fillStyle='#05060f';ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<50;i++)ctx.fillRect((i*113)%W,(i*71)%H,1.5,1.5);
+  // bunkers
+  for(const b of bunkers)for(const blk of b){if(blk.hp<=0)continue;
+    ctx.fillStyle=blk.hp===3?'#5fffac':blk.hp===2?'#ffd35f':'#ff5f6d';ctx.fillRect(blk.x,blk.y,9,9);}
+  for(const a of aliens)if(a.alive)drawAlien(a);
+  if(ufo){ctx.fillStyle='#ff5fd0';ctx.beginPath();ctx.ellipse(ufo.x+ufo.w/2,ufo.y+ufo.h/2,ufo.w/2,ufo.h/2,0,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.fillRect(ufo.x+10,ufo.y-4,ufo.w-20,6);}
+  // ship
+  ctx.fillStyle='#5fffac';ctx.fillRect(ship.x,ship.y+6,ship.w,ship.h-6);
+  ctx.fillRect(ship.x+ship.w/2-3,ship.y,6,8);
+  ctx.fillStyle='#aef';ctx.fillRect(ship.x+ship.w/2-2,ship.y+2,4,4);
+  // bullets
+  ctx.fillStyle='#fff';for(const b of pBullets)ctx.fillRect(b.x-1.5,b.y-8,3,10);
+  ctx.fillStyle='#ff7b7b';for(const b of eBullets)ctx.fillRect(b.x-1.5,b.y,3,9);
+  for(const p of particles){ctx.globalAlpha=p.life/18;ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);}
+  ctx.globalAlpha=1;
+}
+function loop(){if(state==='play'){update();if(state==='play')draw();}requestAnimationFrame(loop);}
+ctx.fillStyle='#05060f';ctx.fillRect(0,0,W,H);
+requestAnimationFrame(loop);
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({
+  left:[{label:'◀',key:'ArrowLeft',cls:'big'},{label:'▶',key:'ArrowRight',cls:'big'}],
+  right:[{label:'🔫',sub:'발사',key:' ',cls:'big'}]
+});
+</script>
+</body>
+</html>

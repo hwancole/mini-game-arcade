@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐤 플래피 점프</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0a1420;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:480px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ffd35f;text-decoration:none;font-weight:bold}
+  #wrap{position:relative}
+  canvas{border:2px solid #2a3a4e;border-radius:8px;display:block;cursor:pointer}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(6,12,20,.85);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#ffd35f}
+  .btn{background:#ffd35f;color:#063;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🐤 플래피 점프</b><span></span></div>
+<div id="wrap">
+  <canvas id="cv" width="420" height="600"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>플래피 점프</h2>
+    <p class="hint">탭/클릭/스페이스로 날아올라 파이프 사이를 통과하세요!</p>
+    <button class="btn" id="startBtn">시작 ▶</button>
+    <p class="hint"><kbd>Space</kbd> / <kbd>클릭</kbd> / <kbd>↑</kbd> 점프</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2>게임 오버</h2>
+    <p class="hint" id="endStats"></p>
+    <button class="btn" id="restartBtn">🔄 재시작</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+let bird,pipes,score,best,state,spawnT,frame;
+best=parseInt(localStorage.getItem('flappy_best')||'0');
+const GAP=160,PIPE_W=64,GRAV=0.5,FLAP=-8;
+
+function start(){
+  bird={x:120,y:H/2,vy:0,r:15,rot:0};
+  pipes=[];score=0;spawnT=0;frame=0;state='play';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+}
+function flap(){if(state==='play')bird.vy=FLAP;else if(state==='menu'||state==='over'){}}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+addEventListener('keydown',e=>{if(e.key===' '||e.key==='ArrowUp'){e.preventDefault();flap();}});
+cv.addEventListener('mousedown',flap);
+cv.addEventListener('touchstart',e=>{e.preventDefault();flap();},{passive:false});
+
+function spawnPipe(){
+  const margin=80;
+  const gy=margin+Math.random()*(H-GAP-margin*2-60);
+  pipes.push({x:W,gy,passed:false});
+}
+function update(){
+  frame++;
+  bird.vy+=GRAV;bird.y+=bird.vy;
+  bird.rot=Math.max(-0.4,Math.min(1.2,bird.vy/12));
+  spawnT--;
+  if(spawnT<=0){spawnPipe();spawnT=90;}
+  for(const p of pipes){
+    p.x-=2.6;
+    if(!p.passed&&p.x+PIPE_W<bird.x){p.passed=true;score++;}
+  }
+  pipes=pipes.filter(p=>p.x+PIPE_W>-10);
+  // collisions
+  if(bird.y+bird.r>H-40||bird.y-bird.r<0)return gameOver();
+  for(const p of pipes){
+    if(bird.x+bird.r>p.x&&bird.x-bird.r<p.x+PIPE_W){
+      if(bird.y-bird.r<p.gy||bird.y+bird.r>p.gy+GAP)return gameOver();
+    }
+  }
+}
+function gameOver(){
+  state='over';
+  if(score>best){best=score;localStorage.setItem('flappy_best',best);}
+  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b><br>최고: ${best}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+function draw(){
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#4ec0ee');g.addColorStop(1,'#9be0f0');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // clouds
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  for(let i=0;i<4;i++){const x=((frame*0.3+i*140)%(W+120))-60,y=60+i*70%200;ctx.beginPath();ctx.arc(x,y,18,0,7);ctx.arc(x+20,y+5,24,0,7);ctx.arc(x+44,y,18,0,7);ctx.fill();}
+  // pipes
+  for(const p of pipes){
+    ctx.fillStyle='#5cb85c';ctx.strokeStyle='#3d7a3d';ctx.lineWidth=3;
+    ctx.fillRect(p.x,0,PIPE_W,p.gy);ctx.strokeRect(p.x,0,PIPE_W,p.gy);
+    ctx.fillRect(p.x-4,p.gy-26,PIPE_W+8,26);ctx.strokeRect(p.x-4,p.gy-26,PIPE_W+8,26);
+    ctx.fillRect(p.x,p.gy+GAP,PIPE_W,H-p.gy-GAP);ctx.strokeRect(p.x,p.gy+GAP,PIPE_W,H-p.gy-GAP);
+    ctx.fillRect(p.x-4,p.gy+GAP,PIPE_W+8,26);ctx.strokeRect(p.x-4,p.gy+GAP,PIPE_W+8,26);
+  }
+  // ground
+  ctx.fillStyle='#ded895';ctx.fillRect(0,H-40,W,40);
+  ctx.fillStyle='#c8b86a';for(let x=0;x<W;x+=20)ctx.fillRect(x,H-40,10,40);
+  ctx.fillStyle='#7ac74f';ctx.fillRect(0,H-44,W,5);
+  // bird
+  ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);
+  ctx.fillStyle='#ffd35f';ctx.beginPath();ctx.arc(0,0,bird.r,0,7);ctx.fill();
+  ctx.fillStyle='#f5a623';ctx.beginPath();ctx.ellipse(-3,2,9,6,0,0,7);ctx.fill(); // wing
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(6,-5,5,0,7);ctx.fill();
+  ctx.fillStyle='#000';ctx.beginPath();ctx.arc(8,-5,2.5,0,7);ctx.fill();
+  ctx.fillStyle='#f5651c';ctx.beginPath();ctx.moveTo(13,0);ctx.lineTo(22,2);ctx.lineTo(13,5);ctx.fill();
+  ctx.restore();
+  // score
+  ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.font='bold 48px sans-serif';ctx.textAlign='center';
+  ctx.strokeText(score,W/2,80);ctx.fillText(score,W/2,80);
+}
+
+function loop(){if(state==='play')update();if(bird)draw();requestAnimationFrame(loop);}
+// idle
+bird={x:120,y:H/2,vy:0,r:15,rot:0};pipes=[];score=0;frame=0;state='menu';
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🃏 카드 짝맞추기</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#161226;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#c46fff;text-decoration:none;font-weight:bold}
+  h1{margin:6px;color:#c46fff}
+  .controls{display:flex;gap:10px;margin:8px;flex-wrap:wrap;justify-content:center}
+  .diff{padding:8px 16px;border:2px solid #444;border-radius:8px;cursor:pointer;background:none;color:#eee;font-weight:bold}
+  .diff.sel{border-color:#c46fff;background:rgba(196,111,255,.18)}
+  .stats{display:flex;gap:24px;margin:8px;font-size:1.2rem;font-weight:bold}
+  #board{display:grid;gap:10px;margin:14px;perspective:800px}
+  .card{position:relative;cursor:pointer;transform-style:preserve-3d;transition:transform .4s}
+  .card.flipped,.card.matched{transform:rotateY(180deg)}
+  .card .face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    border-radius:10px;backface-visibility:hidden;font-size:2rem}
+  .card .back{background:linear-gradient(135deg,#5f3fa8,#c46fff);border:2px solid #d9a8ff}
+  .card .back::after{content:'❓';opacity:.5}
+  .card .front{background:#272040;border:2px solid #463a6e;transform:rotateY(180deg)}
+  .card.matched .front{border-color:#5fffac;box-shadow:0 0 14px #5fffac88}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(10,8,20,.9);text-align:center;gap:14px;z-index:10}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2.2rem;color:#c46fff}
+  .btn{background:#c46fff;color:#fff;border:none;padding:12px 28px;border-radius:8px;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .hint{color:#9aa;font-size:.85rem}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🃏 카드 짝맞추기</b><span></span></div>
+<h1>카드 짝맞추기</h1>
+<div class="controls">
+  <button class="diff sel" data-c="12">쉬움 (6쌍)</button>
+  <button class="diff" data-c="20">보통 (10쌍)</button>
+  <button class="diff" data-c="30">어려움 (15쌍)</button>
+</div>
+<div class="stats"><span>🔄 시도 <span id="moves">0</span></span><span>✅ <span id="pairs">0</span></span><span>⏱️ <span id="time">0</span>s</span></div>
+<div id="board"></div>
+<p class="hint">카드를 뒤집어 같은 그림 두 장을 찾으세요. 적은 시도로 클리어!</p>
+
+<div class="overlay hidden" id="endScreen">
+  <h2>🎉 클리어!</h2>
+  <p id="endStats" style="font-size:1.2rem"></p>
+  <button class="btn" id="restartBtn">🔄 다시하기</button>
+</div>
+
+<script>
+const EMOJIS=['🍎','🍌','🍓','🍇','🍑','🍉','🥝','🍒','🥑','🍍','🥥','🍋','🍊','🫐','🥭','🍐','🌽','🥕','🍄','🌶️'];
+const boardEl=document.getElementById('board');
+const movesEl=document.getElementById('moves'),pairsEl=document.getElementById('pairs'),timeEl=document.getElementById('time');
+let count=12,cards,first,second,lock,moves,pairs,total,timer,timerIv,started;
+
+document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.diff').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');count=+b.dataset.c;newGame();});
+
+function cols(n){if(n===12)return 4;if(n===20)return 5;return 6;}
+
+function newGame(){
+  clearInterval(timerIv);timer=0;started=false;timeEl.textContent=0;
+  moves=0;pairs=0;total=count/2;first=second=null;lock=false;
+  movesEl.textContent=0;pairsEl.textContent='0/'+total;
+  document.getElementById('endScreen').classList.add('hidden');
+  // build deck
+  const picks=EMOJIS.slice(0,total);
+  let deck=[...picks,...picks];
+  for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
+  const c=cols(count);const size=Math.min(96,Math.floor((Math.min(620,window.innerWidth-30))/c)-10);
+  boardEl.style.gridTemplateColumns=`repeat(${c},${size}px)`;
+  boardEl.innerHTML='';cards=[];
+  deck.forEach((em,i)=>{
+    const card=document.createElement('div');card.className='card';
+    card.style.width=card.style.height=size+'px';
+    card.innerHTML=`<div class="face back"></div><div class="face front">${em}</div>`;
+    card.dataset.em=em;card.dataset.i=i;card.matched=false;
+    card.onclick=()=>flip(card);
+    boardEl.appendChild(card);cards.push(card);
+  });
+}
+function startTimer(){if(started)return;started=true;timerIv=setInterval(()=>{timer++;timeEl.textContent=timer;},1000);}
+
+function flip(card){
+  if(lock||card.classList.contains('flipped')||card.classList.contains('matched'))return;
+  startTimer();
+  card.classList.add('flipped');
+  if(!first){first=card;return;}
+  second=card;lock=true;moves++;movesEl.textContent=moves;
+  if(first.dataset.em===second.dataset.em){
+    setTimeout(()=>{
+      first.classList.add('matched');second.classList.add('matched');
+      pairs++;pairsEl.textContent=pairs+'/'+total;
+      first=second=null;lock=false;
+      if(pairs===total)win();
+    },400);
+  } else {
+    setTimeout(()=>{first.classList.remove('flipped');second.classList.remove('flipped');first=second=null;lock=false;},800);
+  }
+}
+function win(){
+  clearInterval(timerIv);
+  const key='memory_best_'+count;const prev=localStorage.getItem(key);
+  let rec='';const sc=moves;
+  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec='<br>🏆 최소 시도 신기록!';}
+  else rec='<br>최소 시도 기록: '+prev;
+  document.getElementById('endStats').innerHTML=`시도: <b>${moves}</b> · 시간: ${timer}초${rec}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+document.getElementById('restartBtn').onclick=newGame;
+addEventListener('resize',()=>{/* keep layout; rebuild on diff change only */});
+newGame();
+</script>
+</body>
+</html>

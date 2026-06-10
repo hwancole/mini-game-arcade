@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🏓 핑퐁</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#08120e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .topbar{width:100%;max-width:720px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fffbc;text-decoration:none;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#0d1f17;border:2px solid #234;border-radius:8px;display:block;touch-action:none}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(4,10,8,.92);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#5fffbc}
+  .btn{background:#5fffbc;color:#063;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .modes{display:flex;gap:10px}
+  .mode{padding:8px 16px;border:2px solid #444;border-radius:8px;cursor:pointer}
+  .mode.sel{border-color:#5fffbc;background:rgba(95,255,188,.15)}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🏓 핑퐁</b><span></span></div>
+<div id="wrap">
+  <canvas id="cv" width="700" height="460"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>핑퐁</h2>
+    <p class="hint">먼저 7점을 내면 승리! 패들을 움직여 공을 받아치세요.</p>
+    <div class="modes">
+      <div class="mode sel" data-m="ai">🤖 vs AI</div>
+      <div class="mode" data-m="2p">👥 2인</div>
+    </div>
+    <button class="btn" id="startBtn">시작 ▶</button>
+    <p class="hint">왼쪽: <kbd>W</kbd>/<kbd>S</kbd> 또는 왼쪽 드래그 · 오른쪽: <kbd>↑</kbd>/<kbd>↓</kbd> 또는 오른쪽 드래그</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle"></h2>
+    <button class="btn" id="restartBtn">🔄 재시작</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
+let mode='ai',left,right,ball,state,sl,sr,keys={};
+const PW=14,PH=88,WIN=7;
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.m;});
+
+function resetBall(dir){ball={x:W/2,y:H/2,vx:(dir||(Math.random()<.5?1:-1))*5,vy:(Math.random()*2-1)*4,r:9,spin:0};}
+function start(){
+  left={x:24,y:H/2-PH/2,vy:0};right={x:W-24-PW,y:H/2-PH/2,vy:0};
+  sl=0;sr=0;resetBall();state='play';
+  startScreen.classList.add('hidden');endScreen.classList.add('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowup','arrowdown'].includes(e.key.toLowerCase()))e.preventDefault();});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+// touch drag — 화면 좌/우 절반으로 패들 조작
+function touchHandler(e){
+  e.preventDefault();const r=cv.getBoundingClientRect();
+  for(const t of e.touches){
+    const x=(t.clientX-r.left)*(W/r.width),y=(t.clientY-r.top)*(H/r.height);
+    if(x<W/2)left.y=y-PH/2;else right.y=y-PH/2;
+  }
+}
+cv.addEventListener('touchstart',touchHandler,{passive:false});
+cv.addEventListener('touchmove',touchHandler,{passive:false});
+// mouse drag (좌측 패들은 마우스로)
+cv.addEventListener('mousemove',e=>{if(state!=='play')return;const r=cv.getBoundingClientRect();const x=(e.clientX-r.left)*(W/r.width),y=(e.clientY-r.top)*(H/r.height);if(mode==='2p'){if(x<W/2)left.y=y-PH/2;else right.y=y-PH/2;}else left.y=y-PH/2;});
+
+function clampPaddle(p){p.y=Math.max(0,Math.min(H-PH,p.y));}
+function update(){
+  // left input (keys W/S)
+  if(keys['w'])left.y-=7;if(keys['s'])left.y+=7;
+  // right input
+  if(mode==='2p'){if(keys['arrowup'])right.y-=7;if(keys['arrowdown'])right.y+=7;}
+  else{ // AI
+    const target=ball.y-PH/2, follow=(ball.vx>0?0.11:0.05);
+    right.y+=(target-right.y)*follow + (Math.random()-.5)*1.5;
+  }
+  clampPaddle(left);clampPaddle(right);
+  // ball
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-1;}
+  if(ball.y>H-ball.r){ball.y=H-ball.r;ball.vy*=-1;}
+  // paddle collisions
+  if(ball.vx<0&&ball.x-ball.r<left.x+PW&&ball.x>left.x&&ball.y>left.y&&ball.y<left.y+PH){
+    ball.x=left.x+PW+ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(left.y+PH/2))/(PH/2))*4;
+  }
+  if(ball.vx>0&&ball.x+ball.r>right.x&&ball.x<right.x+PW&&ball.y>right.y&&ball.y<right.y+PH){
+    ball.x=right.x-ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(right.y+PH/2))/(PH/2))*4;
+  }
+  ball.vx=Math.max(-13,Math.min(13,ball.vx));ball.vy=Math.max(-10,Math.min(10,ball.vy));
+  // score
+  if(ball.x<-20){sr++;score();resetBall(1);}
+  else if(ball.x>W+20){sl++;score();resetBall(-1);}
+}
+function score(){
+  if(sl>=WIN||sr>=WIN){
+    state='over';
+    const p1=sl>=WIN;
+    document.getElementById('endTitle').textContent=(mode==='ai'?(p1?'🏆 승리!':'🤖 AI 승리'):(p1?'🟢 왼쪽 승리!':'🔵 오른쪽 승리!'));
+    endScreen.classList.remove('hidden');
+  }
+}
+
+function draw(){
+  ctx.fillStyle='#0d1f17';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,.18)';ctx.setLineDash([10,14]);ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([]);
+  // scores
+  ctx.fillStyle='rgba(255,255,255,.5)';ctx.font='bold 56px sans-serif';ctx.textAlign='center';
+  ctx.fillText(sl,W/2-70,70);ctx.fillText(sr,W/2+70,70);
+  // paddles
+  ctx.fillStyle='#5fffbc';roundRect(left.x,left.y,PW,PH,7);ctx.fill();
+  ctx.fillStyle='#5fd0ff';roundRect(right.x,right.y,PW,PH,7);ctx.fill();
+  // ball
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,7);ctx.fill();
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function loop(){if(state==='play')update();if(ball)draw();requestAnimationFrame(loop);}
+left={x:24,y:H/2-PH/2};right={x:W-24-PW,y:H/2-PH/2};sl=0;sr=0;resetBall();state='menu';
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

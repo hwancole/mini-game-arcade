@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏎️ 카트 레이싱</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0d1410;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow:hidden}
+  .topbar{width:100%;max-width:960px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ffc371;text-decoration:none;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#1d6b35;border:2px solid #333;border-radius:8px;display:block}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,12,8,.92);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#ffc371}
+  .btn{background:#ffc371;color:#222;border:none;padding:12px 26px;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:bold;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .btn.alt{background:#333;color:#fff}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7;max-width:420px}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px;font-size:.8rem}
+  #count{position:absolute;top:40%;left:0;right:0;text-align:center;font-size:5rem;font-weight:900;color:#fff;text-shadow:0 0 20px #000}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🏎️ 카트 레이싱</b><span id="hud"></span></div>
+<div id="wrap">
+  <canvas id="cv" width="900" height="560"></canvas>
+  <div id="count" style="display:none"></div>
+  <div class="overlay" id="startScreen">
+    <h2>카트 레이싱</h2>
+    <p class="hint">3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다.</p>
+    <button class="btn" id="startBtn">레이스 시작 🏁</button>
+    <p class="hint"><kbd>↑</kbd> 가속 · <kbd>↓</kbd> 브레이크/후진 · <kbd>←</kbd><kbd>→</kbd> 조향 ·
+    <kbd>Shift</kbd> 드리프트(부스터 충전) · <kbd>Space</kbd> 부스터</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle"></h2>
+    <p class="hint" id="endStats"></p>
+    <div style="display:flex;gap:12px">
+      <button class="btn" id="restartBtn">🔄 재시작</button>
+      <a class="btn alt" href="../index.html">메인으로</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const hud=document.getElementById('hud');
+const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
+
+// Track: defined by center polyline + width. We'll use an oval-ish track via checkpoints.
+const cx=W/2, cy=H/2;
+const track=[ // waypoints (center line)
+  {x:200,y:430},{x:160,y:300},{x:200,y:150},{x:360,y:110},{x:520,y:140},
+  {x:560,y:280},{x:640,y:360},{x:740,y:300},{x:730,y:160},{x:640,y:90},
+  {x:760,y:90},{x:830,y:200},{x:790,y:430},{x:600,y:470},{x:400,y:470}
+];
+const ROADW=58;
+
+function nearestSeg(px,py){
+  let best=1e9,bi=0,bt=0,bx=0,by=0;
+  for(let i=0;i<track.length;i++){
+    const a=track[i],b=track[(i+1)%track.length];
+    const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+    let t=((px-a.x)*dx+(py-a.y)*dy)/l2; t=Math.max(0,Math.min(1,t));
+    const qx=a.x+dx*t,qy=a.y+dy*t,d=Math.hypot(px-qx,py-qy);
+    if(d<best){best=d;bi=i;bt=t;bx=qx;by=qy;}
+  }
+  return {dist:best,seg:bi,t:bt,x:bx,y:by};
+}
+function onRoad(px,py){return nearestSeg(px,py).dist<ROADW;}
+
+let karts, state='menu', startTime=0, finishTime=0;
+const COLORS=['#ff5f6d','#5f9fff','#5fffbc','#ffd35f'];
+const NAMES=['플레이어','로디','다오','배찌'];
+
+function startLineDir(){const a=track[0],b=track[1];const ang=Math.atan2(b.y-a.y,b.x-a.x);return ang;}
+
+function initKarts(){
+  const a=track[0]; const ang=startLineDir();
+  const perp=ang+Math.PI/2;
+  karts=[];
+  for(let i=0;i<4;i++){
+    const off=(i-1.5)*20;
+    karts.push({
+      x:a.x+Math.cos(perp)*off, y:a.y+Math.sin(perp)*off,
+      angle:ang, speed:0, color:COLORS[i], name:NAMES[i],
+      isPlayer:i===0, lap:0, seg:0, prog:0, finished:false, finishT:0,
+      driftCharge:0, boost:0, drifting:false, rank:1, lastSeg:0,
+      armed:false, stuck:0, aiTurn:0
+    });
+  }
+}
+
+let keys={};
+addEventListener('keydown',e=>{keys[e.key]=true;if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();});
+addEventListener('keyup',e=>keys[e.key]=false);
+
+function startGame(){
+  initKarts(); state='count'; endScreen.classList.add('hidden'); startScreen.classList.add('hidden');
+  let n=3; const cd=document.getElementById('count'); cd.style.display='block'; cd.textContent=n;
+  const iv=setInterval(()=>{
+    n--; if(n>0){cd.textContent=n;}
+    else if(n===0){cd.textContent='GO!';}
+    else{clearInterval(iv);cd.style.display='none';state='race';startTime=performance.now();}
+  },800);
+}
+document.getElementById('startBtn').onclick=startGame;
+document.getElementById('restartBtn').onclick=startGame;
+
+function updateKart(k,dt,input){
+  const maxSpeed=k.boost>0?6.2:4.3;
+  const accel=0.12, friction=0.045, turnRate=0.045;
+  let onR=onRoad(k.x,k.y);
+  if(input.up)k.speed+=accel; if(input.down)k.speed-=accel*0.8;
+  k.speed*=(1-friction);
+  if(!onR){k.speed*=0.93; if(k.speed>2.4)k.speed=2.4+(k.speed-2.4)*0.5;}
+  k.speed=Math.max(-2,Math.min(maxSpeed,k.speed));
+  let turn=0; if(input.left)turn=-1; if(input.right)turn=1;
+  const speedFactor=Math.min(1,Math.abs(k.speed)/2);
+  k.drifting=input.drift&&Math.abs(turn)>0&&k.speed>2;
+  let tr=turnRate*(k.drifting?1.7:1)*speedFactor*Math.sign(k.speed||1);
+  k.angle+=turn*tr;
+  if(k.drifting){k.driftCharge=Math.min(100,k.driftCharge+1.6);}
+  if(input.boost&&k.driftCharge>20){k.boost=Math.floor(k.driftCharge/2.2);k.driftCharge=0;}
+  if(k.boost>0)k.boost--;
+  // drift slip
+  const moveAng=k.angle+(k.drifting?turn*0.25:0);
+  k.x+=Math.cos(moveAng)*k.speed; k.y+=Math.sin(moveAng)*k.speed;
+  k.x=Math.max(12,Math.min(W-12,k.x)); k.y=Math.max(12,Math.min(H-12,k.y));
+  // progress tracking (checkpoint-armed lap counting prevents false laps at start line)
+  const ns=nearestSeg(k.x,k.y);
+  const newSeg=ns.seg, half=Math.floor(track.length/2);
+  if(newSeg!==k.seg){
+    if(newSeg===half) k.armed=true; // passed the far side of the track
+    // crossing the start/finish line forward, only counts if armed
+    if(k.seg===track.length-1 && newSeg===0 && k.armed){ k.lap++; k.armed=false; }
+    k.seg=newSeg;
+  }
+  k.prog=k.lap*track.length + k.seg + ns.t;
+  if(k.lap>=3 && !k.finished){k.finished=true;k.finishT=performance.now()-startTime;}
+}
+
+function aiInput(k){
+  // stuck recovery: if barely moving for a while, reverse and turn out
+  if(Math.abs(k.speed)<0.4){k.stuck=(k.stuck||0)+1;}else{k.stuck=0;}
+  if(k.stuck>40){
+    if(k.stuck>90)k.stuck=0;
+    return {up:false,down:true,left:k.aiTurn>0,right:k.aiTurn<=0,drift:false,boost:false};
+  }
+  // steer toward a lookahead point (further ahead when fast)
+  const look=Math.abs(k.speed)>3?2:1;
+  const ahead=track[(k.seg+look)%track.length];
+  const desired=Math.atan2(ahead.y-k.y,ahead.x-k.x);
+  let diff=desired-k.angle;
+  while(diff>Math.PI)diff-=2*Math.PI; while(diff<-Math.PI)diff+=2*Math.PI;
+  k.aiTurn=diff;
+  const inp={up:true,down:false,left:diff<-0.06,right:diff>0.06,drift:Math.abs(diff)>0.4&&k.speed>2.5,boost:k.driftCharge>60};
+  if(Math.abs(diff)>0.9)inp.up=false; // brake into sharp corners
+  return inp;
+}
+
+function update(dt){
+  for(const k of karts){
+    if(k.finished)continue;
+    let inp;
+    if(k.isPlayer)inp={up:keys['ArrowUp'],down:keys['ArrowDown'],left:keys['ArrowLeft'],right:keys['ArrowRight'],drift:keys['Shift'],boost:keys[' ']};
+    else inp=aiInput(k);
+    updateKart(k,dt,inp);
+  }
+  // ranking
+  const sorted=[...karts].sort((a,b)=>(b.finished?1e9-b.finishT:b.prog)-(a.finished?1e9-a.finishT:a.prog));
+  sorted.forEach((k,i)=>k.rank=i+1);
+  const player=karts[0];
+  hud.innerHTML=`🏁 ${Math.min(player.lap+1,3)}/3바퀴 · ${player.rank}위 · ⏱️ ${((performance.now()-startTime)/1000).toFixed(1)}s`;
+  if(karts.every(k=>k.finished)){ endRace(); }
+  else if(player.finished && state==='race'){ /* let others finish but allow end */
+    if(performance.now()-startTime - player.finishT>4000) endRace();
+  }
+}
+
+function endRace(){
+  if(state==='over')return; state='over';
+  const sorted=[...karts].sort((a,b)=>(a.finished?a.finishT:1e9)-(b.finished?b.finishT:1e9));
+  const player=karts[0];
+  const rank=sorted.indexOf(player)+1;
+  document.getElementById('endTitle').textContent= rank===1?'🏆 1위! 우승!':`${rank}위로 완주`;
+  let s=`기록: <b>${(player.finishT/1000).toFixed(2)}초</b><br><br>`;
+  sorted.forEach((k,i)=>{s+=`${i+1}위 - ${k.name} ${k.finished?'('+(k.finishT/1000).toFixed(2)+'s)':'(미완주)'}<br>`;});
+  document.getElementById('endStats').innerHTML=s;
+  endScreen.classList.remove('hidden');
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // grass
+  ctx.fillStyle='#1d6b35';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#1a5e2f';
+  for(let x=0;x<W;x+=46)for(let y=(x/46%2)*23;y<H;y+=46){ctx.fillRect(x,y,23,23);}
+  // road
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.strokeStyle='#3a3a44';ctx.lineWidth=ROADW*2;
+  ctx.beginPath();ctx.moveTo(track[0].x,track[0].y);
+  for(let i=1;i<=track.length;i++){const p=track[i%track.length];ctx.lineTo(p.x,p.y);}
+  ctx.stroke();
+  // road edges
+  ctx.strokeStyle='#f4f4f4';ctx.lineWidth=3;ctx.setLineDash([14,14]);
+  ctx.beginPath();ctx.moveTo(track[0].x,track[0].y);
+  for(let i=1;i<=track.length;i++){const p=track[i%track.length];ctx.lineTo(p.x,p.y);}
+  ctx.stroke();ctx.setLineDash([]);
+  // start/finish line
+  const a=track[0],ang=startLineDir(),perp=ang+Math.PI/2;
+  for(let i=-2;i<3;i++)for(let j=0;j<2;j++){
+    ctx.fillStyle=(i+j)%2?'#fff':'#000';
+    const ox=Math.cos(perp)*i*ROADW/2.5+Math.cos(ang)*j*10;
+    const oy=Math.sin(perp)*i*ROADW/2.5+Math.sin(ang)*j*10;
+    ctx.save();ctx.translate(a.x+ox,a.y+oy);ctx.rotate(ang);ctx.fillRect(-5,-ROADW/2.5/2,10,ROADW/2.5);ctx.restore();
+  }
+  // karts
+  for(const k of [...karts].sort((a,b)=>a.isPlayer-b.isPlayer)){
+    ctx.save();ctx.translate(k.x,k.y);ctx.rotate(k.angle);
+    if(k.boost>0){ctx.fillStyle='rgba(255,160,60,.8)';ctx.beginPath();ctx.moveTo(-10,-4);ctx.lineTo(-22-Math.random()*8,0);ctx.lineTo(-10,4);ctx.fill();}
+    if(k.drifting){ctx.fillStyle='rgba(255,255,255,.4)';ctx.fillRect(-12,-8,5,16);}
+    ctx.fillStyle=k.color;
+    ctx.fillRect(-11,-8,22,16);
+    ctx.fillStyle='#222';ctx.fillRect(4,-9,5,18);ctx.fillRect(-9,-9,4,18);
+    ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(-2,-5,8,10);
+    ctx.restore();
+    // name + rank
+    ctx.fillStyle=k.isPlayer?'#ffd35f':'#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(k.name,k.x,k.y-16);
+  }
+  // boost meter (player)
+  const p=karts[0];
+  ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(14,H-30,160,18);
+  ctx.fillStyle='#444';ctx.fillRect(18,H-26,150,10);
+  ctx.fillStyle=p.driftCharge>=20?'#ffc371':'#888';ctx.fillRect(18,H-26,150*(p.driftCharge/100),10);
+  ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText('부스터',18,H-30);
+}
+
+let last=0;
+function loop(t){
+  const dt=Math.min(2,(t-last)/16.67);last=t;
+  if(state==='race')update(dt);
+  if(karts)draw();
+  requestAnimationFrame(loop);
+}
+ctx.fillStyle='#1d6b35';ctx.fillRect(0,0,W,H);
+initKarts(); requestAnimationFrame(loop);
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({
+  dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}},
+  right:[{label:'🌀',sub:'드리프트',key:'Shift'},{label:'🚀',sub:'부스터',key:' ',cls:'big'}]
+});
+</script>
+</body>
+</html>

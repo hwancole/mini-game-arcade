@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🧮 빠른 암산</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#1e1608;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ffc371;text-decoration:none;font-weight:bold}
+  h1{margin:6px;color:#ffc371}
+  .stats{display:flex;gap:18px;margin:8px;font-size:1.1rem;font-weight:bold;flex-wrap:wrap;justify-content:center}
+  .stats .box{background:rgba(255,255,255,.07);padding:7px 14px;border-radius:10px}
+  #combo{color:#ff8f3f}
+  #timebar{width:92%;max-width:420px;height:12px;background:#3a2f1a;border-radius:8px;overflow:hidden;margin:8px}
+  #timefill{height:100%;background:linear-gradient(90deg,#ffd35f,#ff8f3f);width:100%;transition:width .1s linear}
+  #q{font-size:clamp(2.2rem,9vw,3.4rem);font-weight:900;margin:18px;letter-spacing:2px}
+  .answers{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:92%;max-width:420px}
+  .ans{padding:22px;font-size:1.8rem;font-weight:bold;border:none;border-radius:14px;cursor:pointer;
+    background:#3a2f1a;color:#fff;transition:.1s;-webkit-tap-highlight-color:transparent}
+  .ans:active{transform:scale(.95)}
+  .ans.correct{background:#2f8f4f}.ans.wrong{background:#b03030}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(10,8,2,.92);text-align:center;gap:14px;z-index:10;padding:20px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#ffc371}
+  .btn{background:#ffc371;color:#063;border:none;padding:13px 30px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1.05rem}
+  .modes{display:flex;gap:10px}
+  .mode{padding:8px 16px;border:2px solid #555;border-radius:8px;cursor:pointer;color:#eee}
+  .mode.sel{border-color:#ffc371;background:rgba(255,195,113,.18)}
+  .hint{color:#9aa;font-size:.85rem}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🧮 빠른 암산</b><span></span></div>
+<h1>빠른 암산</h1>
+<div class="stats">
+  <div class="box">⭐ <span id="score">0</span></div>
+  <div class="box">🔥 콤보 <span id="combo">0</span></div>
+  <div class="box">✅ <span id="correct">0</span></div>
+  <div class="box">🏆 <span id="best">0</span></div>
+</div>
+<div id="timebar"><div id="timefill"></div></div>
+<div id="q">?</div>
+<div class="answers" id="answers"></div>
+
+<div class="overlay" id="startScreen">
+  <h2>빠른 암산</h2>
+  <p class="hint">제한시간 안에 정답을 고르세요! 맞히면 시간이 조금 회복되고, 콤보가 쌓일수록 고득점.</p>
+  <div class="modes">
+    <div class="mode sel" data-d="easy">쉬움</div>
+    <div class="mode" data-d="normal">보통</div>
+    <div class="mode" data-d="hard">어려움</div>
+  </div>
+  <button class="btn" id="startBtn">시작 ▶</button>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <h2>⏰ 종료!</h2>
+  <p id="endStats" style="font-size:1.2rem"></p>
+  <button class="btn" id="restartBtn">🔄 다시하기</button>
+</div>
+
+<script>
+const scoreEl=document.getElementById('score'),comboEl=document.getElementById('combo'),correctEl=document.getElementById('correct'),bestEl=document.getElementById('best');
+const qEl=document.getElementById('q'),ansEl=document.getElementById('answers'),timeFill=document.getElementById('timefill');
+let diff='easy',score,combo,correct,answer,timeLeft,maxTime,running,lastTick;
+let best=parseInt(localStorage.getItem('math_best')||'0');bestEl.textContent=best;
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');diff=m.dataset.d;});
+
+function genQ(){
+  let a,b,op,ans,text;
+  const r=Math.random();
+  if(diff==='easy'){a=1+Math.floor(Math.random()*12);b=1+Math.floor(Math.random()*12);op=r<.5?'+':'-';}
+  else if(diff==='normal'){a=2+Math.floor(Math.random()*20);b=2+Math.floor(Math.random()*12);op=['+','-','×'][Math.floor(r*3)];}
+  else{a=5+Math.floor(Math.random()*40);b=2+Math.floor(Math.random()*15);op=['+','-','×','×'][Math.floor(r*4)];}
+  if(op==='-'&&b>a){[a,b]=[b,a];}
+  ans= op==='+'?a+b: op==='-'?a-b: a*b;
+  text=`${a} ${op} ${b}`;
+  return {text,ans};
+}
+function newQuestion(){
+  const q=genQ();answer=q.ans;qEl.textContent=q.text+' = ?';
+  // build options
+  const opts=new Set([answer]);
+  while(opts.size<4){let d=answer+ (Math.floor(Math.random()*11)-5)*(1+Math.floor(Math.random()*3));if(d!==answer&&d>=0)opts.add(d);else opts.add(answer+opts.size*2+1);}
+  const arr=[...opts];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  ansEl.innerHTML='';
+  arr.forEach(v=>{const b=document.createElement('button');b.className='ans';b.textContent=v;b.onclick=()=>choose(v,b);ansEl.appendChild(b);});
+}
+function choose(v,btn){
+  if(!running)return;
+  if(v===answer){
+    btn.classList.add('correct');score+=10+combo*2;combo++;correct++;
+    timeLeft=Math.min(maxTime,timeLeft+0.6);
+    scoreEl.textContent=score;comboEl.textContent=combo;correctEl.textContent=correct;
+    setTimeout(newQuestion,120);
+  } else {
+    btn.classList.add('wrong');combo=0;comboEl.textContent=0;timeLeft=Math.max(0,timeLeft-1.5);
+    [...ansEl.children].forEach(b=>{if(+b.textContent===answer)b.classList.add('correct');});
+    setTimeout(newQuestion,400);
+  }
+}
+function start(){
+  score=0;combo=0;correct=0;maxTime=diff==='hard'?6:diff==='normal'?7:9;timeLeft=maxTime;running=true;lastTick=performance.now();
+  scoreEl.textContent=0;comboEl.textContent=0;correctEl.textContent=0;
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+  newQuestion();requestAnimationFrame(tick);
+}
+function tick(t){
+  if(!running)return;
+  const dt=(t-lastTick)/1000;lastTick=t;timeLeft-=dt;
+  if(timeLeft<=0){timeLeft=0;return end();}
+  timeFill.style.width=(timeLeft/maxTime*100)+'%';
+  requestAnimationFrame(tick);
+}
+function end(){
+  running=false;timeFill.style.width='0%';
+  if(score>best){best=score;localStorage.setItem('math_best',best);bestEl.textContent=best;}
+  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 정답 ${correct}개<br>최고: ${best}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+</script>
+</body>
+</html>

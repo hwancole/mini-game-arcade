@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🌀 미로 탈출</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#120a1e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#c46fff;text-decoration:none;font-weight:bold}
+  .controls{display:flex;gap:8px;margin:6px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:7px 14px;border:2px solid #555;border-radius:8px;cursor:pointer;color:#eee;background:none;font-weight:bold}
+  .opt.sel{border-color:#c46fff;background:rgba(196,111,255,.18)}
+  .stats{display:flex;gap:20px;margin:6px;font-size:1.05rem;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#0a0612;border:2px solid #2a1a44;border-radius:8px;display:block;touch-action:none}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(10,6,18,.9);border-radius:8px;text-align:center;gap:12px;z-index:5}
+  .overlay.hidden{display:none}.overlay h2{color:#5fffac;font-size:1.8rem}
+  .btn{background:#c46fff;color:#fff;border:none;padding:11px 24px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .hint{color:#9aa;font-size:.85rem;text-align:center;padding:0 16px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🌀 미로 탈출</b><span></span></div>
+<div class="controls">
+  <button class="opt sel" data-n="10">쉬움</button>
+  <button class="opt" data-n="16">보통</button>
+  <button class="opt" data-n="24">어려움</button>
+</div>
+<div class="stats"><span>👣 <span id="moves">0</span></span><span>⏱️ <span id="time">0</span>s</span><span>🏆 <span id="best">–</span></span></div>
+<div id="wrap">
+  <canvas id="cv" width="500" height="500"></canvas>
+  <div class="overlay hidden" id="winScreen"><h2>🎉 탈출 성공!</h2><p id="winStats"></p><button class="btn" id="winBtn">새 미로</button></div>
+</div>
+<button class="btn" id="newBtn" style="margin:10px">🔀 새 미로</button>
+<p class="hint">🟣에서 🟢까지! 방향키 · 스와이프 · 아래 버튼으로 이동하세요.</p>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const movesEl=document.getElementById('moves'),timeEl=document.getElementById('time'),bestEl=document.getElementById('best');
+let N=10,cells,player,moves,started,timer,timerIv,cellPx,won,trail;
+
+document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;newGame();});
+document.getElementById('newBtn').onclick=newGame;
+document.getElementById('winBtn').onclick=newGame;
+
+// cell walls: {n,e,s,w} true=wall
+function genMaze(){
+  cells=Array.from({length:N},()=>Array.from({length:N},()=>({n:true,e:true,s:true,w:true,v:false})));
+  const stack=[[0,0]];cells[0][0].v=true;
+  while(stack.length){
+    const [x,y]=stack[stack.length-1];
+    const nb=[];
+    if(y>0&&!cells[y-1][x].v)nb.push([x,y-1,'n','s']);
+    if(x<N-1&&!cells[y][x+1].v)nb.push([x+1,y,'e','w']);
+    if(y<N-1&&!cells[y+1][x].v)nb.push([x,y+1,'s','n']);
+    if(x>0&&!cells[y][x-1].v)nb.push([x-1,y,'w','e']);
+    if(nb.length){
+      const [nx,ny,d,od]=nb[Math.floor(Math.random()*nb.length)];
+      cells[y][x][d]=false;cells[ny][nx][od]=false;cells[ny][nx].v=true;stack.push([nx,ny]);
+    } else stack.pop();
+  }
+}
+function newGame(){
+  genMaze();player={x:0,y:0};moves=0;won=false;trail=[];
+  movesEl.textContent=0;clearInterval(timerIv);timer=0;timeEl.textContent=0;started=false;
+  bestEl.textContent=localStorage.getItem('maze_best_'+N)||'–';
+  document.getElementById('winScreen').classList.add('hidden');
+  cellPx=cv.width/N;draw();
+}
+function tryMove(dx,dy){
+  if(won)return;
+  const c=cells[player.y][player.x];
+  if(dx===1&&c.e)return;if(dx===-1&&c.w)return;if(dy===1&&c.s)return;if(dy===-1&&c.n)return;
+  player.x+=dx;player.y+=dy;moves++;movesEl.textContent=moves;
+  trail.push({x:player.x,y:player.y});
+  if(!started){started=true;timerIv=setInterval(()=>{timer++;timeEl.textContent=timer;},1000);}
+  if(player.x===N-1&&player.y===N-1)win();
+  draw();
+}
+function win(){
+  won=true;clearInterval(timerIv);
+  const key='maze_best_'+N,prev=localStorage.getItem(key);let rec='';
+  const sc=timer;
+  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=' (신기록!)';}
+  bestEl.textContent=localStorage.getItem(key);
+  document.getElementById('winStats').innerHTML=`${moves}걸음 · ${timer}초${rec}`;
+  document.getElementById('winScreen').classList.remove('hidden');
+}
+function draw(){
+  const S=cellPx;ctx.fillStyle='#0a0612';ctx.fillRect(0,0,cv.width,cv.height);
+  // trail
+  ctx.fillStyle='rgba(196,111,255,.16)';
+  for(const t of trail)ctx.fillRect(t.x*S+2,t.y*S+2,S-4,S-4);
+  // goal
+  ctx.fillStyle='#2f8f4f';ctx.fillRect((N-1)*S+S*0.2,(N-1)*S+S*0.2,S*0.6,S*0.6);
+  // walls
+  ctx.strokeStyle='#9a6fff';ctx.lineWidth=Math.max(2,S*0.09);ctx.lineCap='round';
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const c=cells[y][x],px=x*S,py=y*S;
+    ctx.beginPath();
+    if(c.n){ctx.moveTo(px,py);ctx.lineTo(px+S,py);}
+    if(c.e){ctx.moveTo(px+S,py);ctx.lineTo(px+S,py+S);}
+    if(c.s){ctx.moveTo(px,py+S);ctx.lineTo(px+S,py+S);}
+    if(c.w){ctx.moveTo(px,py);ctx.lineTo(px,py+S);}
+    ctx.stroke();
+  }
+  // player
+  ctx.fillStyle='#c46fff';ctx.beginPath();ctx.arc(player.x*S+S/2,player.y*S+S/2,S*0.3,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(player.x*S+S/2-S*0.08,player.y*S+S/2-S*0.06,S*0.07,0,7);ctx.fill();
+}
+addEventListener('keydown',e=>{
+  let m=false;
+  if(e.key==='ArrowUp'){tryMove(0,-1);m=true;}else if(e.key==='ArrowDown'){tryMove(0,1);m=true;}
+  else if(e.key==='ArrowLeft'){tryMove(-1,0);m=true;}else if(e.key==='ArrowRight'){tryMove(1,0);m=true;}
+  if(m)e.preventDefault();
+});
+let sx,sy;
+cv.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
+cv.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<18)return;
+  if(Math.abs(dx)>Math.abs(dy))tryMove(dx>0?1:-1,0);else tryMove(0,dy>0?1:-1);},{passive:true});
+newGame();
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({ dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'},repeat:true} });
+</script>
+</body>
+</html>

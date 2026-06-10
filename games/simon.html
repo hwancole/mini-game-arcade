@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧠 사이먼</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#12121e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fd0ff;text-decoration:none;font-weight:bold}
+  h1{margin:6px;color:#5fd0ff}
+  .stats{display:flex;gap:30px;margin:8px;font-size:1.2rem;font-weight:bold}
+  #simon{position:relative;width:340px;height:340px;border-radius:50%;background:#222;margin:14px;
+    box-shadow:0 0 40px rgba(0,0,0,.6)}
+  .pad{position:absolute;width:170px;height:170px;cursor:pointer;opacity:.45;transition:opacity .1s}
+  .pad.lit{opacity:1;box-shadow:0 0 40px currentColor}
+  .pad.green{top:0;left:0;background:#3fd07a;border-radius:170px 0 0 0;color:#3fd07a}
+  .pad.red{top:0;right:0;background:#ff5f6d;border-radius:0 170px 0 0;color:#ff5f6d}
+  .pad.yellow{bottom:0;left:0;background:#ffd35f;border-radius:0 0 0 170px;color:#ffd35f}
+  .pad.blue{bottom:0;right:0;background:#5f9fff;border-radius:0 0 170px 0;color:#5f9fff}
+  #center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:120px;height:120px;
+    background:#12121e;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:6px solid #222;z-index:2}
+  #centerNum{font-size:2.4rem;font-weight:900;color:#5fd0ff}
+  #centerLbl{font-size:.7rem;color:#889}
+  .btn{background:#5fd0ff;color:#063;border:none;padding:12px 28px;border-radius:8px;font-weight:bold;cursor:pointer;margin:8px;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .modes{display:flex;gap:10px;margin:6px}
+  .mode{padding:6px 14px;border:2px solid #444;border-radius:8px;cursor:pointer;font-size:.85rem}
+  .mode.sel{border-color:#5fd0ff;background:rgba(95,208,255,.15)}
+  #msg{height:26px;font-weight:bold;font-size:1.1rem}
+  .hint{color:#9aa;font-size:.85rem;text-align:center}
+  @media (max-width:400px){
+    #simon{width:300px;height:300px}
+    .pad{width:150px;height:150px}
+    .pad.green{border-radius:150px 0 0 0}.pad.red{border-radius:0 150px 0 0}
+    .pad.yellow{border-radius:0 0 0 150px}.pad.blue{border-radius:0 0 150px 0}
+    #center{width:104px;height:104px}#centerNum{font-size:2rem}
+  }
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🧠 사이먼</b><span></span></div>
+<h1>사이먼 (기억력)</h1>
+<div class="stats"><span>🎯 레벨 <span id="level">0</span></span><span>🏆 최고 <span id="best">0</span></span></div>
+<div class="modes">
+  <div class="mode sel" data-s="normal">보통</div>
+  <div class="mode" data-s="fast">빠름</div>
+  <div class="mode" data-s="strict">스트릭트</div>
+</div>
+<div id="simon">
+  <div class="pad green" data-i="0"></div>
+  <div class="pad red" data-i="1"></div>
+  <div class="pad yellow" data-i="2"></div>
+  <div class="pad blue" data-i="3"></div>
+  <div id="center"><div id="centerNum">–</div><div id="centerLbl">레벨</div></div>
+</div>
+<div id="msg"></div>
+<button class="btn" id="startBtn">시작 ▶</button>
+<p class="hint">불빛이 켜지는 순서를 기억하고 똑같이 따라 누르세요. 한 단계씩 길어집니다!</p>
+
+<script>
+const pads=[...document.querySelectorAll('.pad')];
+const FREQ=[330,415,494,587];
+let seq,input,level,best,state,speed=600,strict=false,mode='normal';
+const levelEl=document.getElementById('level'),bestEl=document.getElementById('best'),
+      msgEl=document.getElementById('msg'),centerNum=document.getElementById('centerNum');
+best=parseInt(localStorage.getItem('simon_best')||'0');bestEl.textContent=best;
+let audio;
+
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
+  document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.s;
+  speed=mode==='fast'?380:600;strict=mode==='strict';});
+
+function beep(i,dur=300){
+  try{
+    audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+    const o=audio.createOscillator(),g=audio.createGain();
+    o.frequency.value=FREQ[i];o.type='sine';o.connect(g);g.connect(audio.destination);
+    g.gain.setValueAtTime(0.0001,audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3,audio.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,audio.currentTime+dur/1000);
+    o.start();o.stop(audio.currentTime+dur/1000);
+  }catch(e){}
+}
+function light(i,dur=300){pads[i].classList.add('lit');beep(i,dur);setTimeout(()=>pads[i].classList.remove('lit'),dur-50);}
+
+function start(){
+  seq=[];level=0;state='play';msgEl.textContent='';
+  nextRound();
+}
+document.getElementById('startBtn').onclick=()=>{if(state!=='showing'&&state!=='input')start();};
+
+function nextRound(){
+  level++;levelEl.textContent=level;centerNum.textContent=level;
+  seq.push(Math.floor(Math.random()*4));
+  input=[];
+  playSeq();
+}
+function playSeq(){
+  state='showing';msgEl.style.color='#9aa';msgEl.textContent='잘 보세요...';
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i>=seq.length){clearInterval(iv);state='input';msgEl.textContent='따라 누르세요!';msgEl.style.color='#5fffac';return;}
+    light(seq[i],Math.max(220,speed-60));i++;
+  },speed);
+}
+pads.forEach(p=>{
+  p.onclick=()=>{
+    if(state!=='input')return;
+    const i=+p.dataset.i;light(i,250);
+    input.push(i);
+    const idx=input.length-1;
+    if(input[idx]!==seq[idx]){return fail();}
+    if(input.length===seq.length){
+      state='play';msgEl.textContent='✅ 정확해요!';msgEl.style.color='#5fffac';
+      if(level>best){best=level;localStorage.setItem('simon_best',best);bestEl.textContent=best;}
+      setTimeout(nextRound,900);
+    }
+  };
+});
+function fail(){
+  // flash all red-ish
+  pads.forEach(p=>p.classList.add('lit'));beep(1,150);
+  setTimeout(()=>pads.forEach(p=>p.classList.remove('lit')),250);
+  if(strict){
+    state='over';msgEl.style.color='#ff5f6d';msgEl.textContent=`❌ 틀렸어요! 레벨 ${level}에서 종료`;
+    centerNum.textContent='–';
+  } else {
+    state='showing';msgEl.style.color='#ffd35f';msgEl.textContent='❌ 다시! 같은 순서를 보여줄게요';
+    input=[];setTimeout(playSeq,1200);
+  }
+}
+</script>
+</body>
+</html>

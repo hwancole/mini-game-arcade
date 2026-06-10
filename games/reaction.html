@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚡ 반응속도 테스트</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0c1420;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fffac;text-decoration:none;font-weight:bold}
+  h1{margin:8px;color:#5fffac}
+  #pad{width:92%;max-width:600px;height:min(60vh,440px);border-radius:18px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;cursor:pointer;text-align:center;padding:20px;
+    font-size:1.6rem;font-weight:bold;transition:background .05s;margin:10px}
+  .wait{background:#b03030}.ready{background:#2f8f4f}.idle{background:#2a3550}.early{background:#7a5a20}.result{background:#234}
+  #pad small{font-size:1rem;font-weight:normal;opacity:.85;margin-top:10px;display:block}
+  .stats{display:flex;gap:24px;font-size:1.05rem;font-weight:bold;margin:8px;flex-wrap:wrap;justify-content:center}
+  .stats .box{background:rgba(255,255,255,.07);padding:8px 16px;border-radius:10px}
+  .hint{color:#9aa;font-size:.85rem;text-align:center;padding:0 16px}
+  .runs{display:flex;gap:6px;margin:8px;flex-wrap:wrap;justify-content:center;max-width:600px}
+  .runs span{background:rgba(255,255,255,.08);padding:4px 10px;border-radius:8px;font-size:.85rem}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>⚡ 반응속도</b><span></span></div>
+<h1>반응속도 테스트</h1>
+<div id="pad" class="idle">탭하여 시작<small>초록색으로 바뀌는 순간 즉시 탭하세요!</small></div>
+<div class="stats">
+  <div class="box">마지막 <span id="last">–</span></div>
+  <div class="box">평균 <span id="avg">–</span></div>
+  <div class="box">최고 <span id="best">–</span></div>
+</div>
+<div class="runs" id="runs"></div>
+<p class="hint">총 5회 측정합니다. 초록불 전에 누르면 실패! 인간 평균은 약 250ms입니다.</p>
+
+<script>
+const pad=document.getElementById('pad');
+const lastEl=document.getElementById('last'),avgEl=document.getElementById('avg'),bestEl=document.getElementById('best'),runsEl=document.getElementById('runs');
+let state='idle',startT,timeoutId,times=[];
+let best=parseInt(localStorage.getItem('reaction_best')||'0');
+if(best)bestEl.textContent=best+'ms';
+
+function setPad(cls,main,sub){pad.className=cls;pad.innerHTML=main+(sub?`<small>${sub}</small>`:'');}
+
+function begin(){
+  times=[];runsEl.innerHTML='';next();
+}
+function next(){
+  if(times.length>=5){finish();return;}
+  state='wait';setPad('wait','준비...','초록색이 되면 탭!');
+  const delay=900+Math.random()*2600;
+  timeoutId=setTimeout(()=>{state='ready';startT=performance.now();setPad('ready','지금 탭!','');},delay);
+}
+function finish(){
+  const avg=Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+  const bestRun=Math.min(...times);
+  if(!best||bestRun<best){best=bestRun;localStorage.setItem('reaction_best',best);}
+  bestEl.textContent=best+'ms';avgEl.textContent=avg+'ms';
+  state='idle';setPad('result',`완료! 평균 ${avg}ms`,'탭하여 다시 측정');
+}
+function tap(){
+  if(state==='idle'||state==='result'){begin();return;}
+  if(state==='wait'){ // too early
+    clearTimeout(timeoutId);state='early';setPad('early','너무 빨라요! 😅','탭하여 계속');
+    state='idle';return;
+  }
+  if(state==='ready'){
+    const t=Math.round(performance.now()-startT);
+    times.push(t);lastEl.textContent=t+'ms';
+    const s=document.createElement('span');s.textContent=`#${times.length}: ${t}ms`;runsEl.appendChild(s);
+    state='between';setPad('idle',`${t}ms 👍`,'탭하여 다음');
+    return;
+  }
+  if(state==='between'){next();}
+}
+pad.addEventListener('mousedown',e=>{e.preventDefault();tap();});
+pad.addEventListener('touchstart',e=>{e.preventDefault();tap();},{passive:false});
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();tap();}});
+</script>
+</body>
+</html>

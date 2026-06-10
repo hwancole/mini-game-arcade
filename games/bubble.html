@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🫧 버블 슈터</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0e0a1e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .topbar{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fd0ff;text-decoration:none;font-weight:bold}
+  .stats{display:flex;gap:24px;margin:6px;font-size:1.1rem;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#150f2e;border:2px solid #2a2050;border-radius:8px;display:block;cursor:crosshair}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,6,18,.92);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#5fd0ff}
+  .btn{background:#5fd0ff;color:#063;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🫧 버블 슈터</b><span></span></div>
+<div class="stats"><span>⭐ <span id="score">0</span></span><span>🎯 <span id="shots">0</span></span><span>🏆 <span id="best">0</span></span></div>
+<div id="wrap">
+  <canvas id="cv" width="480" height="600"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>버블 슈터</h2>
+    <p class="hint">같은 색 버블 3개 이상을 모아 터뜨리세요! 천장의 모든 버블을 제거하면 클리어. 버블이 바닥선에 닿으면 게임 오버.</p>
+    <button class="btn" id="startBtn">시작 ▶</button>
+    <p class="hint">마우스로 조준 · 클릭으로 발사</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle"></h2>
+    <p class="hint" id="endStats"></p>
+    <button class="btn" id="restartBtn">🔄 재시작</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const R=22,COLS=10,ROWS=14;
+const COLORS=['#ff5f6d','#5fd0ff','#ffd35f','#5fffac','#c46fff'];
+const scoreEl=document.getElementById('score'),shotsEl=document.getElementById('shots'),bestEl=document.getElementById('best');
+best=parseInt(localStorage.getItem('bubble_best')||'0');bestEl.textContent=best;
+const LINE=H-70;
+let grid,cur,nextC,shooter,flying,score,shots,state,pop,colorsInPlay;
+
+function rowOffset(r){return (r%2)?R:0;}
+function cellX(r,c){return R+ c*R*2 + rowOffset(r);}
+function cellY(r){return R+30 + r*R*1.75;}
+
+function neighbors(r,c){
+  const even=r%2===0;
+  const d=even?[[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]]:[[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]];
+  return d.map(([dr,dc])=>[r+dr,c+dc]).filter(([nr,nc])=>nr>=0&&nr<ROWS&&nc>=0&&nc<COLS);
+}
+
+function randColor(){return colorsInPlay[Math.floor(Math.random()*colorsInPlay.length)];}
+function updateColorsInPlay(){
+  const set=new Set();for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c])set.add(grid[r][c]);
+  colorsInPlay=set.size?[...set]:COLORS.slice();
+}
+
+function start(){
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  for(let r=0;r<5;r++)for(let c=0;c<COLS-(r%2);c++)grid[r][c]=COLORS[Math.floor(Math.random()*COLORS.length)];
+  updateColorsInPlay();
+  score=0;shots=0;flying=null;pop=[];
+  cur=randColor();nextC=randColor();
+  scoreEl.textContent=0;shotsEl.textContent=0;
+  state='aim';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+
+let aim={x:W/2,y:0};
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();aim.x=(e.clientX-r.left)*(W/r.width);aim.y=(e.clientY-r.top)*(H/r.height);});
+cv.addEventListener('click',shoot);
+
+function shoot(){
+  if(state!=='aim')return;
+  let a=Math.atan2(aim.y-(H-40),aim.x-W/2);
+  if(a>-0.15)a=-0.15;if(a<-Math.PI+0.15)a=-Math.PI+0.15; // clamp upward
+  flying={x:W/2,y:H-40,vx:Math.cos(a)*9,vy:Math.sin(a)*9,color:cur};
+  cur=nextC;nextC=randColor();
+  shots++;shotsEl.textContent=shots;state='fly';
+}
+
+function nearestCell(x,y){
+  let best=null,bd=1e9;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS-(r%2?1:0);c++){
+    if(grid[r][c])continue;
+    const d=Math.hypot(x-cellX(r,c),y-cellY(r));
+    if(d<bd){bd=d;best=[r,c];}
+  }
+  return best;
+}
+function snap(){
+  const [r,c]=nearestCell(flying.x,flying.y)||[0,0];
+  grid[r][c]=flying.color;
+  flying=null;
+  // find matching cluster
+  const match=cluster(r,c,grid[r][c]);
+  if(match.length>=3){
+    for(const [mr,mc] of match){pop.push({x:cellX(mr,mc),y:cellY(mr,mc),color:grid[mr][mc],life:18});grid[mr][mc]=null;}
+    score+=match.length*10;
+    dropFloating();
+  }
+  scoreEl.textContent=score;
+  updateColorsInPlay();
+  checkState();
+}
+function cluster(r,c,color){
+  const seen=new Set([r+','+c]),stack=[[r,c]],out=[[r,c]];
+  while(stack.length){const [cr,cc]=stack.pop();
+    for(const [nr,nc] of neighbors(cr,cc)){const k=nr+','+nc;if(!seen.has(k)&&grid[nr][nc]===color){seen.add(k);stack.push([nr,nc]);out.push([nr,nc]);}}}
+  return out;
+}
+function dropFloating(){
+  // anchored = connected to top row
+  const anchored=new Set();
+  for(let c=0;c<COLS;c++)if(grid[0][c]){floodAnchor(0,c,anchored);}
+  let dropped=0;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]&&!anchored.has(r+','+c)){pop.push({x:cellX(r,c),y:cellY(r),color:grid[r][c],life:24,fall:true,vy:1});grid[r][c]=null;dropped++;}
+  }
+  score+=dropped*20;
+}
+function floodAnchor(r,c,set){
+  const stack=[[r,c]];set.add(r+','+c);
+  while(stack.length){const [cr,cc]=stack.pop();
+    for(const [nr,nc] of neighbors(cr,cc)){const k=nr+','+nc;if(!set.has(k)&&grid[nr][nc]){set.add(k);stack.push([nr,nc]);}}}
+}
+function checkState(){
+  // win: no bubbles
+  let any=false,lowest=0;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c]){any=true;lowest=Math.max(lowest,cellY(r));}
+  if(!any)return end(true);
+  if(lowest+R>=LINE)return end(false);
+  state='aim';
+}
+function end(win){
+  state='over';
+  if(score>best){best=score;localStorage.setItem('bubble_best',best);bestEl.textContent=best;}
+  document.getElementById('endTitle').textContent=win?'🏆 클리어!':'💀 게임 오버';
+  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 발사 ${shots}회<br>최고: ${best}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+function update(){
+  if(flying){
+    flying.x+=flying.vx;flying.y+=flying.vy;
+    if(flying.x<R){flying.x=R;flying.vx*=-1;}
+    if(flying.x>W-R){flying.x=W-R;flying.vx*=-1;}
+    // hit top
+    if(flying.y<R+30){snap();return;}
+    // hit existing bubble
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(grid[r][c]&&Math.hypot(flying.x-cellX(r,c),flying.y-cellY(r))<R*1.9){snap();return;}
+    }
+  }
+  for(const p of pop){p.life--;if(p.fall){p.vy+=0.6;p.y+=p.vy;}}
+  pop=pop.filter(p=>p.life>0||(p.fall&&p.y<H+30));
+}
+
+function drawBubble(x,y,color,rad=R){
+  ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,rad-1,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(x-rad/3,y-rad/3,rad/3.2,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.2)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,rad-1,0,7);ctx.stroke();
+}
+function draw(){
+  ctx.fillStyle='#150f2e';ctx.fillRect(0,0,W,H);
+  // danger line
+  ctx.strokeStyle='rgba(255,95,109,.5)';ctx.setLineDash([8,8]);ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,LINE);ctx.lineTo(W,LINE);ctx.stroke();ctx.setLineDash([]);
+  // grid
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c])drawBubble(cellX(r,c),cellY(r),grid[r][c]);
+  // pops
+  for(const p of pop){ctx.globalAlpha=p.fall?1:Math.max(0,p.life/18);drawBubble(p.x,p.y,p.color,p.fall?R:R*(p.life/18)+4);}
+  ctx.globalAlpha=1;
+  // flying
+  if(flying)drawBubble(flying.x,flying.y,flying.color);
+  // shooter
+  ctx.save();
+  // aim guide
+  if(state==='aim'){
+    let a=Math.atan2(aim.y-(H-40),aim.x-W/2);if(a>-0.15)a=-0.15;if(a<-Math.PI+0.15)a=-Math.PI+0.15;
+    let gx=W/2,gy=H-40,vx=Math.cos(a),vy=Math.sin(a);
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    for(let i=0;i<24;i++){gx+=vx*12;gy+=vy*12;if(gx<R){gx=R;vx*=-1;}if(gx>W-R){gx=W-R;vx*=-1;}if(gy<R+30)break;ctx.beginPath();ctx.arc(gx,gy,2.5,0,7);ctx.fill();}
+  }
+  ctx.restore();
+  // current + next
+  if(cur)drawBubble(W/2,H-40,cur);
+  if(nextC){ctx.globalAlpha=.7;drawBubble(W/2-50,H-30,nextC,14);ctx.globalAlpha=1;
+    ctx.fillStyle='#889';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('NEXT',W/2-50,H-8);}
+}
+
+function loop(){if(state==='aim'||state==='fly'){update();}if(grid)draw();requestAnimationFrame(loop);}
+// idle bg
+ctx.fillStyle='#150f2e';ctx.fillRect(0,0,W,H);
+requestAnimationFrame(loop);
+</script>
+<script>
+// 터치: 드래그로 조준, 떼면 발사
+(function(){
+  function aimAt(t){const r=cv.getBoundingClientRect();aim.x=(t.clientX-r.left)*(W/r.width);aim.y=(t.clientY-r.top)*(H/r.height);}
+  cv.addEventListener('touchstart',e=>{e.preventDefault();aimAt(e.touches[0]);},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();aimAt(e.touches[0]);},{passive:false});
+  cv.addEventListener('touchend',e=>{e.preventDefault();shoot();},{passive:false});
+})();
+</script>
+</body>
+</html>

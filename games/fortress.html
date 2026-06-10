@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💥 포트리스 포격전</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0a0e1a;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;overflow:hidden}
+  .topbar{width:100%;max-width:960px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5f9fff;text-decoration:none;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#0a0e1a;border:2px solid #333;border-radius:8px;display:block}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(6,10,20,.93);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#5f9fff}
+  .btn{background:#5f9fff;color:#fff;border:none;padding:12px 26px;border-radius:8px;font-size:1rem;cursor:pointer;font-weight:bold;transition:.15s}
+  .btn:hover{transform:scale(1.05)}
+  .btn.alt{background:#333}
+  .modes{display:flex;gap:12px}
+  .mode{padding:12px 20px;border:2px solid #444;border-radius:10px;cursor:pointer;transition:.15s}
+  .mode.sel{border-color:#5f9fff;background:rgba(95,159,255,.15)}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7;max-width:440px}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px;font-size:.8rem}
+  #controls{width:900px;max-width:100%;display:flex;gap:16px;justify-content:center;align-items:center;
+    padding:10px;background:rgba(255,255,255,.04);border-radius:8px;margin-top:8px;flex-wrap:wrap}
+  .ctl{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.8rem;color:#9aa}
+  .ctl b{color:#fff;font-size:1.1rem}
+  #fireBtn{background:#ff5f6d;color:#fff;border:none;padding:10px 28px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:1rem}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>💥 포트리스 포격전</b><span id="turnLabel"></span></div>
+<div id="wrap">
+  <canvas id="cv" width="900" height="500"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>포트리스 포격전</h2>
+    <p class="hint">각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다.</p>
+    <div class="modes">
+      <div class="mode sel" data-mode="ai"><b>🤖 vs AI</b></div>
+      <div class="mode" data-mode="2p"><b>👥 2인 대전</b></div>
+    </div>
+    <button class="btn" id="startBtn">전투 시작 ▶</button>
+    <p class="hint"><kbd>←</kbd><kbd>→</kbd> 각도 · <kbd>↑</kbd><kbd>↓</kbd> 파워 · <kbd>Space</kbd> 발사</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 id="endTitle"></h2>
+    <div style="display:flex;gap:12px">
+      <button class="btn" id="restartBtn">🔄 재시작</button>
+      <a class="btn alt" href="../index.html">메인으로</a>
+    </div>
+  </div>
+</div>
+<div id="controls">
+  <div class="ctl">각도<b id="angV">45°</b></div>
+  <div class="ctl">파워<b id="powV">50</b></div>
+  <div class="ctl">바람<b id="windV">→ 0</b></div>
+  <button id="fireBtn">발사 🔥</button>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
+const turnLabel=document.getElementById('turnLabel');
+let mode='ai';
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.mode;});
+
+let terrain=new Float32Array(W); // height of ground at each x
+let tanks, turn, wind, state='menu', proj=null, particles=[], aiTimer=0, aiThinking=false;
+
+function genTerrain(){
+  let h=300+Math.random()*40;
+  const pts=[];
+  for(let i=0;i<8;i++)pts.push(200+Math.random()*180);
+  for(let x=0;x<W;x++){
+    const t=x/W*(pts.length-1);const i=Math.floor(t),f=t-i;
+    const a=pts[i],b=pts[Math.min(i+1,pts.length-1)];
+    terrain[x]=a+(b-a)*(3*f*f-2*f*f*f); // smoothstep
+  }
+}
+function groundY(x){x=Math.max(0,Math.min(W-1,Math.round(x)));return terrain[x];}
+
+function initTanks(){
+  const x1=80+Math.random()*60, x2=W-140-Math.random()*60;
+  tanks=[
+    {x:x1,color:'#5f9fff',name:'플레이어 1',hp:100,angle:45,power:50,aim:1},
+    {x:x2,color:'#ff5f6d',name:mode==='ai'?'AI':'플레이어 2',hp:100,angle:135,power:50,aim:-1},
+  ];
+}
+function newWind(){wind=(Math.random()*2-1)*0.06;}
+
+function startGame(){
+  genTerrain();initTanks();turn=0;newWind();state='aim';proj=null;particles=[];
+  startScreen.classList.add('hidden');endScreen.classList.add('hidden');updateHUD();
+  if(mode==='ai'&&turn===1)aiMove();
+}
+document.getElementById('startBtn').onclick=startGame;
+document.getElementById('restartBtn').onclick=startGame;
+
+function updateHUD(){
+  const t=tanks[turn];
+  document.getElementById('angV').textContent=Math.round(t.aim>0?t.angle:180-t.angle)+'°';
+  document.getElementById('powV').textContent=Math.round(t.power);
+  const ws=Math.abs(wind)*100;
+  document.getElementById('windV').textContent=(wind>=0?'→ ':'← ')+ws.toFixed(0);
+  turnLabel.innerHTML=`<span style="color:${t.color}">● ${t.name}</span> 턴`;
+}
+
+let keys={};
+addEventListener('keydown',e=>{
+  if(state!=='aim'||(mode==='ai'&&turn===1))return;
+  const t=tanks[turn];const k=e.key;
+  if(k==='ArrowLeft'){t.angle=Math.min(170,t.angle+2);e.preventDefault();}
+  if(k==='ArrowRight'){t.angle=Math.max(10,t.angle-2);e.preventDefault();}
+  if(k==='ArrowUp'){t.power=Math.min(100,t.power+1.5);e.preventDefault();}
+  if(k==='ArrowDown'){t.power=Math.max(5,t.power-1.5);e.preventDefault();}
+  if(k===' '){fire();e.preventDefault();}
+  updateHUD();
+});
+document.getElementById('fireBtn').onclick=()=>{if(state==='aim'&&!(mode==='ai'&&turn===1))fire();};
+
+function fire(){
+  if(state!=='aim')return;
+  const t=tanks[turn];
+  const gx=t.x, gy=groundY(t.x)-10;
+  const rad=t.angle*Math.PI/180;
+  const v=t.power*0.22;
+  proj={x:gx+Math.cos(rad)*22,y:gy-Math.sin(rad)*22,vx:Math.cos(rad)*v,vy:-Math.sin(rad)*v,trail:[]};
+  state='fly';
+}
+
+function explode(x,y,r){
+  // carve crater: lower the surface (increase terrain y) where the blast reaches
+  for(let i=Math.max(0,(x-r)|0);i<Math.min(W,(x+r)|0);i++){
+    const d=Math.abs(i-x);
+    const depth=Math.sqrt(Math.max(0,r*r-d*d));
+    const craterTop=y+depth;
+    if(craterTop>terrain[i])terrain[i]=Math.min(H,craterTop);
+  }
+  // particles
+  for(let i=0;i<30;i++){const a=Math.random()*7,s=Math.random()*5;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:25+Math.random()*15,color:['#ff5f6d','#ffc371','#fff'][i%3],r:1+Math.random()*3});}
+  // damage tanks
+  for(const tk of tanks){
+    const dd=Math.hypot(tk.x-x,groundY(tk.x)-y);
+    if(dd<r+18){tk.hp-=Math.round((1-dd/(r+18))*45+5);if(tk.hp<0)tk.hp=0;}
+  }
+}
+
+function settleTanks(){
+  for(const t of tanks){ /* tanks sit on ground; recompute via groundY in draw */ }
+}
+
+function nextTurn(){
+  // check deaths
+  if(tanks[0].hp<=0||tanks[1].hp<=0){
+    state='over';
+    const winner=tanks[0].hp<=0?tanks[1]:tanks[0];
+    document.getElementById('endTitle').innerHTML=`🏆 <span style="color:${winner.color}">${winner.name}</span> 승리!`;
+    endScreen.classList.remove('hidden');return;
+  }
+  turn=1-turn; newWind(); state='aim'; updateHUD();
+  if(mode==='ai'&&turn===1)aiMove();
+}
+
+function aiMove(){
+  aiThinking=true;
+  // crude: aim toward enemy with some noise, simulate to refine
+  const me=tanks[1],en=tanks[0];
+  let bestAng=120,bestPow=55,bestDist=1e9;
+  for(let a=95;a<=170;a+=3){
+    for(let p=30;p<=100;p+=6){
+      const d=simulate(me.x,a,p);
+      const dist=Math.abs(d-en.x);
+      if(dist<bestDist){bestDist=dist;bestAng=a;bestPow=p;}
+    }
+  }
+  // add slight inaccuracy
+  me.angle=bestAng+(Math.random()*8-4);
+  me.power=Math.max(5,Math.min(100,bestPow+(Math.random()*10-5)));
+  updateHUD();
+  aiTimer=50; // frames to wait then fire
+}
+function simulate(sx,angle,power){
+  const rad=angle*Math.PI/180,v=power*0.22;
+  let x=sx+Math.cos(rad)*22,y=groundY(sx)-32-Math.sin(rad)*22,vx=Math.cos(rad)*v,vy=-Math.sin(rad)*v;
+  for(let i=0;i<600;i++){vx+=wind;vy+=0.12;x+=vx;y+=vy;if(x<0||x>W)return -999;if(y>=groundY(x))return x;}
+  return x;
+}
+
+function update(){
+  if(state==='aim'&&mode==='ai'&&turn===1&&aiTimer>0){aiTimer--;if(aiTimer===0)fire();}
+  if(state==='fly'&&proj){
+    proj.vx+=wind; proj.vy+=0.12;
+    proj.x+=proj.vx; proj.y+=proj.vy;
+    proj.trail.push({x:proj.x,y:proj.y});if(proj.trail.length>20)proj.trail.shift();
+    if(proj.x<-50||proj.x>W+50){proj=null;nextTurn();}
+    else if(proj.y>=groundY(proj.x)){explode(proj.x,groundY(proj.x),34);proj=null;state='boom';setTimeout(nextTurn,700);}
+    // direct hit tank
+    else for(const tk of tanks){if(Math.hypot(tk.x-proj.x,(groundY(tk.x)-14)-proj.y)<18){explode(proj.x,proj.y,40);proj=null;state='boom';setTimeout(nextTurn,700);break;}}
+  }
+  for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;}
+  particles=particles.filter(p=>p.life>0);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a2a4a');g.addColorStop(1,'#0a0e1a');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.fillStyle='rgba(255,255,255,.4)';for(let i=0;i<40;i++){ctx.fillRect((i*97)%W,(i*53)%200,1.5,1.5);}
+  // terrain
+  ctx.beginPath();ctx.moveTo(0,H);
+  for(let x=0;x<W;x++)ctx.lineTo(x,terrain[x]);
+  ctx.lineTo(W,H);ctx.closePath();
+  const tg=ctx.createLinearGradient(0,200,0,H);tg.addColorStop(0,'#4a7a3a');tg.addColorStop(0.1,'#3a5f2a');tg.addColorStop(1,'#2a3f1a');
+  ctx.fillStyle=tg;ctx.fill();
+  ctx.strokeStyle='#6aaa4a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x++)ctx.lineTo(x,terrain[x]);ctx.stroke();
+  // tanks
+  for(let i=0;i<tanks.length;i++){
+    const t=tanks[i],gy=groundY(t.x);
+    ctx.save();ctx.translate(t.x,gy);
+    // barrel
+    const rad=t.angle*Math.PI/180;
+    ctx.strokeStyle='#888';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(Math.cos(rad)*24,-12-Math.sin(rad)*24);ctx.stroke();
+    // body
+    ctx.fillStyle=t.color;ctx.beginPath();ctx.ellipse(0,-6,18,9,0,Math.PI,0);ctx.fill();
+    ctx.fillRect(-18,-6,36,7);
+    ctx.fillStyle='#333';ctx.fillRect(-16,1,32,5);
+    ctx.restore();
+    // hp bar
+    ctx.fillStyle='#000';ctx.fillRect(t.x-22,gy-44,44,7);
+    ctx.fillStyle=t.hp>40?'#5fffbc':'#ff5f6d';ctx.fillRect(t.x-22,gy-44,44*(t.hp/100),7);
+    ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText(t.hp,t.x,gy-46);
+    // turn indicator
+    if(i===turn&&state==='aim'){ctx.fillStyle='#ffd35f';ctx.beginPath();ctx.moveTo(t.x,gy-52);ctx.lineTo(t.x-6,gy-62);ctx.lineTo(t.x+6,gy-62);ctx.fill();}
+  }
+  // aim guide
+  if(state==='aim'&&!(mode==='ai'&&turn===1)){
+    const t=tanks[turn],gy=groundY(t.x),rad=t.angle*Math.PI/180,v=t.power*0.22;
+    let x=t.x+Math.cos(rad)*22,y=gy-32-Math.sin(rad)*22,vx=Math.cos(rad)*v,vy=-Math.sin(rad)*v;
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    for(let i=0;i<14;i++){vx+=wind;vy+=0.12;x+=vx*2;y+=vy*2;if(y>groundY(x))break;ctx.beginPath();ctx.arc(x,y,2,0,7);ctx.fill();}
+  }
+  // projectile
+  if(proj){
+    for(let i=0;i<proj.trail.length;i++){ctx.globalAlpha=i/proj.trail.length*0.6;ctx.fillStyle='#ffc371';ctx.beginPath();ctx.arc(proj.trail[i].x,proj.trail[i].y,2,0,7);ctx.fill();}
+    ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(proj.x,proj.y,4,0,7);ctx.fill();
+  }
+  for(const p of particles){ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();}
+  ctx.globalAlpha=1;
+  if(mode==='ai'&&turn===1&&state==='aim'){ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('🤖 AI가 조준 중...',W/2,30);}
+}
+
+function loop(){if(state!=='menu')update();if(tanks)draw();requestAnimationFrame(loop);}
+genTerrain();initTanks();turn=0;newWind();
+requestAnimationFrame(loop);
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({
+  dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'},repeat:true},
+  right:[{label:'🔥',sub:'발사',key:' ',cls:'big'}]
+});
+</script>
+</body>
+</html>

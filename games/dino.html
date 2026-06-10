@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🦖 다이노 런</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#1a1a2e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh}
+  .topbar{width:100%;max-width:800px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#9fe07a;text-decoration:none;font-weight:bold}
+  #wrap{position:relative;width:100%;max-width:800px}
+  canvas{background:#f7f7fa;border:2px solid #333;border-radius:8px;display:block;width:100%}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,8,16,.86);border-radius:8px;text-align:center;padding:20px;gap:14px}
+  .overlay.hidden{display:none}
+  .overlay h2{font-size:2rem;color:#9fe07a}
+  .btn{background:#9fe07a;color:#063;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>🦖 다이노 런</b><span id="hud"></span></div>
+<div id="wrap">
+  <canvas id="cv" width="800" height="300"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2>다이노 런</h2>
+    <p class="hint">선인장은 점프로 피하고, 새는 숙여서 피하세요! 갈수록 빨라집니다.</p>
+    <button class="btn" id="startBtn">시작 ▶</button>
+    <p class="hint"><kbd>Space</kbd>/<kbd>↑</kbd>/탭 점프 · <kbd>↓</kbd>/아래 숙이기</p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2>게임 오버</h2>
+    <p class="hint" id="endStats"></p>
+    <button class="btn" id="restartBtn">🔄 재시작</button>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+const hud=document.getElementById('hud');
+const GROUND=H-40;
+let dino,obstacles,clouds,speed,score,best,state,spawnT,night;
+best=parseInt(localStorage.getItem('dino_best')||'0');
+
+function start(){
+  dino={x:60,y:GROUND,vy:0,w:44,h:48,duck:false,onGround:true,leg:0};
+  obstacles=[];clouds=[];speed=6;score=0;spawnT=40;night=0;state='play';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+
+function jump(){if(state!=='play')return;if(dino.onGround){dino.vy=-14;dino.onGround=false;}}
+function setDuck(v){if(dino)dino.duck=v&&dino.onGround?true:(v&&!dino.onGround?true:false);if(dino)dino.duck=v;}
+
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k===' '||k==='arrowup'||k==='w'){e.preventDefault();jump();}
+  if(k==='arrowdown'||k==='s'){e.preventDefault();setDuck(true);}
+});
+addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k==='arrowdown'||k==='s')setDuck(false);});
+// touch: 상단 탭=점프, 하단 누르기=숙이기
+cv.addEventListener('touchstart',e=>{e.preventDefault();const r=cv.getBoundingClientRect();const ty=(e.touches[0].clientY-r.top)/r.height;
+  if(ty>0.6)setDuck(true);else jump();},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();setDuck(false);},{passive:false});
+cv.addEventListener('mousedown',()=>jump());
+
+function spawn(){
+  const r=Math.random();
+  if(r<0.35&&score>200){ // bird
+    const heights=[GROUND-70,GROUND-40,GROUND-10];
+    obstacles.push({type:'bird',x:W+20,y:heights[Math.floor(Math.random()*3)],w:40,h:28,f:0});
+  } else {
+    const n=1+Math.floor(Math.random()*3);
+    obstacles.push({type:'cactus',x:W+20,y:GROUND,w:18*n,h:36+Math.random()*14,n});
+  }
+}
+function update(){
+  speed+=0.0025;score+=speed*0.05;
+  night=(Math.floor(score/1000)%2);
+  // dino physics
+  dino.vy+=0.8;dino.y+=dino.vy;
+  if(dino.y>=GROUND){dino.y=GROUND;dino.vy=0;dino.onGround=true;}else dino.onGround=false;
+  dino.h=(dino.duck&&dino.onGround)?28:48;
+  dino.leg=(dino.leg+speed*0.3)%2;
+  // obstacles
+  spawnT--;
+  if(spawnT<=0){spawn();spawnT=Math.max(30,70-speed*2)+Math.random()*40;}
+  for(const o of obstacles){o.x-=speed;if(o.type==='bird')o.f+=0.2;}
+  obstacles=obstacles.filter(o=>o.x+o.w>-10);
+  // clouds
+  if(Math.random()<0.02)clouds.push({x:W+30,y:30+Math.random()*90});
+  for(const c of clouds)c.x-=speed*0.3;clouds=clouds.filter(c=>c.x>-60);
+  // collision
+  const dh=dino.h, dy=dino.y-dh;
+  for(const o of obstacles){
+    const oy=o.type==='bird'?o.y:o.y-o.h;
+    if(dino.x+6<o.x+o.w&&dino.x+dino.w-6>o.x&&dy+4<oy+o.h&&dy+dh>oy+ (o.type==='bird'?4:0)){
+      return gameOver();
+    }
+  }
+  hud.textContent='🏃 '+Math.floor(score)+'  🏆 '+best;
+}
+function gameOver(){
+  state='over';
+  if(score>best){best=Math.floor(score);localStorage.setItem('dino_best',best);}
+  document.getElementById('endStats').innerHTML=`거리: <b>${Math.floor(score)}</b><br>최고: ${best}`;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+function draw(){
+  const bg=night?'#222238':'#f7f7fa', fg=night?'#cfd':'#535366';
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  // clouds
+  ctx.fillStyle=night?'#3a3a55':'#dde';
+  for(const c of clouds){ctx.beginPath();ctx.arc(c.x,c.y,12,0,7);ctx.arc(c.x+14,c.y+4,16,0,7);ctx.arc(c.x+32,c.y,12,0,7);ctx.fill();}
+  // ground
+  ctx.strokeStyle=fg;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,GROUND);ctx.lineTo(W,GROUND);ctx.stroke();
+  ctx.fillStyle=fg;for(let i=0;i<W;i+=40){const x=(i-(score*0.0))%W;ctx.fillRect((i- (Math.floor(score)%40)),GROUND+6,8,2);}
+  // obstacles
+  for(const o of obstacles){
+    if(o.type==='cactus'){
+      ctx.fillStyle=night?'#7ac74f':'#3d8b3d';
+      for(let k=0;k<o.n;k++){const cx=o.x+k*18;ctx.fillRect(cx+4,o.y-o.h,8,o.h);ctx.fillRect(cx,o.y-o.h*0.6,4,8);ctx.fillRect(cx+12,o.y-o.h*0.7,4,8);}
+    } else {
+      ctx.fillStyle=fg;const fl=Math.floor(o.f%2);
+      ctx.beginPath();ctx.ellipse(o.x+o.w/2,o.y+o.h/2,o.w/2,o.h/2,0,0,7);ctx.fill();
+      ctx.beginPath();ctx.moveTo(o.x+8,o.y+o.h/2);ctx.lineTo(o.x+o.w/2,o.y+(fl?-6:14)+o.h/2);ctx.lineTo(o.x+o.w-8,o.y+o.h/2);ctx.fill();
+      ctx.fillStyle=night?'#ffd':'#222';
+    }
+  }
+  // dino
+  ctx.fillStyle=night?'#9fe07a':'#444';
+  const dh=dino.h, dx=dino.x, dy=dino.y-dh;
+  if(dino.duck&&dino.onGround){
+    ctx.fillRect(dx,dy+8,dino.w+10,dh-8);
+    ctx.fillRect(dx+dino.w,dy,22,18); // head forward
+    ctx.fillStyle=bg;ctx.fillRect(dx+dino.w+14,dy+5,4,4);
+  } else {
+    ctx.fillRect(dx,dy,dino.w-12,dh-14); // body
+    ctx.fillRect(dx+dino.w-22,dy-4,22,18); // head
+    ctx.fillRect(dx+dino.w-26,dy+dh-22,8,10); // tail-ish
+    // legs
+    const lg=Math.floor(dino.leg);
+    ctx.fillRect(dx+6,dy+dh-14,7,14-(lg?0:4));
+    ctx.fillRect(dx+18,dy+dh-14,7,14-(lg?4:0));
+    ctx.fillStyle=bg;ctx.fillRect(dx+dino.w-12,dy+1,4,4); // eye
+  }
+}
+function loop(){if(state==='play'){update();}if(dino)draw();requestAnimationFrame(loop);}
+ctx.fillStyle='#f7f7fa';ctx.fillRect(0,0,W,H);
+dino={x:60,y:GROUND,vy:0,w:44,h:48,duck:false,onGround:true,leg:0};obstacles=[];clouds=[];score=0;state='menu';
+requestAnimationFrame(loop);
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({ left:[{label:'⤓',sub:'숙이기',key:'ArrowDown',cls:'big'}], right:[{label:'⤴',sub:'점프',key:'ArrowUp',cls:'big'}] });
+</script>
+</body>
+</html>
