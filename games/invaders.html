@@ -32,7 +32,7 @@
   <canvas id="cv" width="600" height="560"></canvas>
   <div class="overlay" id="startScreen">
     <h2 data-ko="스페이스 인베이더" data-en="Space Invaders">스페이스 인베이더</h2>
-    <p class="hint" data-ko="외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요." data-en="An alien fleet is descending! Shoot them all down and defend Earth. Use the bunkers for cover.">외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요.</p>
+    <p class="hint" data-ko="외계 함대를 모두 격추! 방어막 뒤에 숨고, 🛸UFO를 맞히면 파워업(연사·3연발·실드)이 떨어집니다. 1500·4000점에 추가 목숨!" data-en="Shoot down the whole fleet! Hide behind bunkers; hit the 🛸UFO for a power-up (rapid/triple/shield) drop. Extra life at 1500 & 4000!">외계 함대를 모두 격추! 방어막 뒤에 숨고, 🛸UFO를 맞히면 파워업(연사·3연발·실드)이 떨어집니다. 1500·4000점에 추가 목숨!</p>
     <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
     <p class="hint"><kbd>←→</kbd> / <kbd>A D</kbd> <span data-ko="이동" data-en="Move">이동</span> · <kbd>Space</kbd> <span data-ko="발사" data-en="Fire">발사</span></p>
   </div>
@@ -50,6 +50,32 @@ const scoreEl=document.getElementById('score'),livesEl=document.getElementById('
 let ship,aliens,pBullets,eBullets,bunkers,ufo,score,lives,wave,state,dir,stepT,fireT,ufoT,particles;
 best=parseInt(localStorage.getItem('invaders_best')||'0');bestEl.textContent=best;
 const AC=['#ff5f6d','#ffd35f','#5fd0ff'];
+let shake=0, pops=[], powerups=[], marchIdx=0, frame=0, extraGiven=0;
+function addShake(n){shake=Math.min(14,shake+n);}
+
+// ---- 사운드 (WebAudio) ----
+let aud=null;
+function actx(){ if(!aud){ try{ aud=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return aud; }
+function tone(f,f2,dur,type,vol,when){ const a=actx(); if(!a)return; const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t0); if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.07,t0); g.gain.exponentialRampToValueAtTime(0.0008,t0+dur); o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+dur); }
+function noise(dur,vol){ const a=actx(); if(!a)return; const n=a.sampleRate*dur|0,buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2); const s=a.createBufferSource();s.buffer=buf;const g=a.createGain();g.gain.value=vol||0.12;s.connect(g);g.connect(a.destination);s.start(); }
+const MARCH=[120,108,96,86];
+function sfx(type){ switch(type){
+  case 'shoot': tone(820,420,0.08,'square',0.05); break;
+  case 'march': tone(MARCH[marchIdx],MARCH[marchIdx],0.09,'square',0.06); break;
+  case 'explode': tone(220,50,0.18,'square',0.08); noise(0.14,0.1); break;
+  case 'hit': tone(300,55,0.35,'sawtooth',0.14); noise(0.3,0.14); break;
+  case 'ufo': tone(500,800,0.12,'triangle',0.08); tone(800,500,0.12,'triangle',0.08,0.12); break;
+  case 'ufohit': tone(900,300,0.2,'square',0.1); break;
+  case 'power': tone(400,900,0.18,'triangle',0.1); break;
+  case 'catch': tone(660,990,0.12,'square',0.1); tone(990,1320,0.1,'square',0.1,0.1); break;
+  case 'wave': [392,523,659,784].forEach((f,i)=>tone(f,f,0.11,'square',0.1,i*0.09)); break;
+  case 'extralife': tone(784,1175,0.22,'square',0.12); break;
+  case 'over': [330,247,196,131].forEach((f,i)=>tone(f,f,0.2,'sawtooth',0.12,i*0.14)); break;
+} }
+function popText(x,y,txt,col){ pops.push({x,y,txt,col:col||'#fff',life:50}); }
 
 function buildWave(){
   aliens=[];const rows=5,cols=10;
@@ -57,7 +83,7 @@ function buildWave(){
     aliens.push({x:60+c*46,y:60+r*38,w:30,h:22,row:r,alive:true,
       color:AC[r<1?0:r<3?1:2],pts:(rows-r)*10});
   }
-  dir=1;stepT=0;
+  dir=1;stepT=0;frame=0;marchIdx=0;
 }
 function buildBunkers(){
   bunkers=[];
@@ -72,11 +98,11 @@ function buildBunkers(){
   }
 }
 function start(){
-  ship={x:W/2-18,y:H-50,w:36,h:18,cool:0};
-  pBullets=[];eBullets=[];particles=[];ufo=null;
+  ship={x:W/2-18,y:H-50,w:36,h:18,cool:0,inv:90,power:null,powerT:0,shield:false};
+  pBullets=[];eBullets=[];particles=[];pops=[];powerups=[];ufo=null;shake=0;extraGiven=0;
   score=0;lives=3;wave=1;ufoT=600+Math.random()*400;
   scoreEl.textContent=0;livesEl.textContent=3;waveEl.textContent=1;
-  buildWave();buildBunkers();state='play';
+  buildWave();buildBunkers();state='play';actx();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
 }
@@ -87,7 +113,14 @@ let keys={};
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
-function fire(){if(ship.cool>0)return;ship.cool=18;pBullets.push({x:ship.x+ship.w/2,y:ship.y,vy:-8});}
+function fire(){
+  if(ship.cool>0)return;
+  ship.cool=ship.power==='rapid'?9:18;
+  const cx=ship.x+ship.w/2;
+  if(ship.power==='triple'){ [-7,0,7].forEach(o=>pBullets.push({x:cx+o,y:ship.y,vy:-8,dx:o*0.04})); }
+  else pBullets.push({x:cx,y:ship.y,vy:-8,dx:0});
+  sfx('shoot');
+}
 function boom(x,y,col){for(let i=0;i<10;i++){const a=Math.random()*7;particles.push({x,y,vx:Math.cos(a)*Math.random()*3,vy:Math.sin(a)*Math.random()*3,life:18,color:col});}}
 
 function hitBunker(x,y){
@@ -97,26 +130,27 @@ function hitBunker(x,y){
   return false;
 }
 
+function powerName(k){return k==='rapid'?t('연사!','RAPID!'):k==='triple'?t('3연발!','TRIPLE!'):t('실드!','SHIELD!');}
 function update(){
+  if(ship.inv>0)ship.inv--;
+  if(ship.powerT>0){ship.powerT--; if(ship.powerT===0)ship.power=null;}
   if(keys['arrowleft']||keys['a'])ship.x-=5;
   if(keys['arrowright']||keys['d'])ship.x+=5;
   ship.x=Math.max(6,Math.min(W-ship.w-6,ship.x));
   if(keys[' '])fire();
   if(ship.cool>0)ship.cool--;
 
-  // alien movement (step)
+  // 적 행진 (남을수록 빨라지고 행진음 가속)
   const alive=aliens.filter(a=>a.alive);
-  const speed=Math.max(8,46-alive.length*0.6-wave*2);
+  const speed=Math.max(7,46-alive.length*0.6-wave*2);
   stepT++;
   if(stepT>=speed){
-    stepT=0;
+    stepT=0; frame^=1; marchIdx=(marchIdx+1)%4; sfx('march');
     let edge=false;
     for(const a of alive){if((dir>0&&a.x+a.w>W-12)||(dir<0&&a.x<12))edge=true;}
     if(edge){dir*=-1;for(const a of alive)a.y+=16;}
     else for(const a of alive)a.x+=dir*10;
-    // reached bottom?
     for(const a of alive)if(a.y+a.h>=ship.y-6)return end(false);
-    // alien fire
     if(alive.length&&Math.random()<0.6+wave*0.05){
       const shooter=alive[Math.floor(Math.random()*alive.length)];
       eBullets.push({x:shooter.x+shooter.w/2,y:shooter.y+shooter.h,vy:3+wave*0.3});
@@ -124,68 +158,112 @@ function update(){
   }
   // UFO
   ufoT--;
-  if(ufoT<=0&&!ufo){ufo={x:-40,y:34,w:38,h:16,pts:[50,100,150][Math.floor(Math.random()*3)]};ufoT=700+Math.random()*500;}
+  if(ufoT<=0&&!ufo){ufo={x:-40,y:34,w:38,h:16,pts:[50,100,150][Math.floor(Math.random()*3)]};ufoT=700+Math.random()*500;sfx('ufo');}
   if(ufo){ufo.x+=2.2;if(ufo.x>W+40)ufo=null;}
 
   // player bullets
   for(const b of pBullets){
-    b.y+=b.vy;
+    b.y+=b.vy; b.x+=(b.dx||0)*8;
     if(hitBunker(b.x,b.y)){b.dead=true;continue;}
-    for(const a of alive){if(b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){a.alive=false;b.dead=true;score+=a.pts;boom(a.x+a.w/2,a.y+a.h/2,a.color);break;}}
-    if(ufo&&b.x>ufo.x&&b.x<ufo.x+ufo.w&&b.y>ufo.y&&b.y<ufo.y+ufo.h){score+=ufo.pts;boom(ufo.x+ufo.w/2,ufo.y,'#ff5fd0');ufo=null;b.dead=true;}
+    for(const a of alive){if(a.alive&&b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){a.alive=false;b.dead=true;score+=a.pts;boom(a.x+a.w/2,a.y+a.h/2,a.color);sfx('explode');break;}}
+    if(ufo&&b.x>ufo.x&&b.x<ufo.x+ufo.w&&b.y>ufo.y&&b.y<ufo.y+ufo.h){
+      score+=ufo.pts;popText(ufo.x+ufo.w/2,ufo.y,'+'+ufo.pts,'#ff5fd0');boom(ufo.x+ufo.w/2,ufo.y,'#ff5fd0');sfx('ufohit');addShake(3);
+      const kinds=['rapid','triple','shield']; powerups.push({x:ufo.x+ufo.w/2,y:ufo.y,vy:1.6,kind:kinds[Math.floor(Math.random()*kinds.length)]});
+      ufo=null;b.dead=true;}
   }
   pBullets=pBullets.filter(b=>!b.dead&&b.y>-10);
+  // 파워업 낙하/획득
+  for(const pu of powerups){ pu.y+=pu.vy;
+    if(pu.y>ship.y-8&&pu.y<ship.y+ship.h&&pu.x>ship.x-6&&pu.x<ship.x+ship.w+6){
+      pu.dead=true; sfx('catch');
+      if(pu.kind==='shield')ship.shield=true; else {ship.power=pu.kind;ship.powerT=600;}
+      popText(ship.x+ship.w/2,ship.y-12,powerName(pu.kind),'#5fffac');
+    }
+  }
+  powerups=powerups.filter(pu=>!pu.dead&&pu.y<H+12);
   // enemy bullets
   for(const b of eBullets){
     b.y+=b.vy;
     if(hitBunker(b.x,b.y)){b.dead=true;continue;}
-    if(b.x>ship.x&&b.x<ship.x+ship.w&&b.y>ship.y&&b.y<ship.y+ship.h){
-      b.dead=true;lives--;livesEl.textContent=lives;boom(ship.x+ship.w/2,ship.y,'#5fffac');
-      if(lives<=0)return end(false);
+    if(ship.inv<=0 && b.x>ship.x&&b.x<ship.x+ship.w&&b.y>ship.y&&b.y<ship.y+ship.h){
+      b.dead=true;
+      if(ship.shield){ ship.shield=false; ship.inv=45; boom(ship.x+ship.w/2,ship.y,'#5fd0ff'); addShake(4); sfx('explode'); }
+      else { lives--;livesEl.textContent=lives; ship.inv=120; boom(ship.x+ship.w/2,ship.y+8,'#5fffac'); addShake(9); sfx('hit');
+        eBullets.forEach(e=>e.dead=true);
+        if(lives<=0)return end(false);
+      }
     }
   }
   eBullets=eBullets.filter(b=>!b.dead&&b.y<H+10);
+  // 추가 목숨 (1500/4000점)
+  if(extraGiven<1&&score>=1500){extraGiven=1;lives++;livesEl.textContent=lives;sfx('extralife');popText(ship.x+ship.w/2,ship.y-22,'1UP','#ffd35f');}
+  else if(extraGiven<2&&score>=4000){extraGiven=2;lives++;livesEl.textContent=lives;sfx('extralife');popText(ship.x+ship.w/2,ship.y-22,'1UP','#ffd35f');}
   scoreEl.textContent=score;
   for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.life--;}
   particles=particles.filter(p=>p.life>0);
+  for(const pp of pops){pp.y-=0.6;pp.life--;} pops=pops.filter(pp=>pp.life>0);
+  if(shake>0.3)shake*=0.85; else shake=0;
   if(score>best){best=score;localStorage.setItem('invaders_best',best);bestEl.textContent=best;}
-  // next wave
-  if(alive.length===0){wave++;waveEl.textContent=wave;buildWave();eBullets=[];}
+  if(alive.length===0){wave++;waveEl.textContent=wave;buildWave();eBullets=[];ship.inv=Math.max(ship.inv,50);sfx('wave');}
 }
 function end(win){
-  state='over';
+  state='over'; sfx('over');
   document.getElementById('endTitle').textContent=win?t('🏆 승리!','🏆 Victory!'):t('💀 게임 오버','💀 Game Over');
   document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`,`Score: <b>${score}</b> · Wave ${wave}<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
 function drawAlien(a){
-  ctx.fillStyle=a.alive?a.color:'#333';
+  ctx.fillStyle=a.color;
   const x=a.x,y=a.y,w=a.w,h=a.h;
   ctx.fillRect(x+6,y,w-12,h-8);
   ctx.fillRect(x,y+6,w,h-12);
-  ctx.fillRect(x+2,y+h-6,6,6);ctx.fillRect(x+w-8,y+h-6,6,6);
+  // 다리 (프레임마다 교차 애니메이션)
+  if(frame){ ctx.fillRect(x+2,y+h-6,6,6);ctx.fillRect(x+w-8,y+h-6,6,6); }
+  else { ctx.fillRect(x,y+h-5,6,5);ctx.fillRect(x+w-6,y+h-5,6,5);ctx.fillRect(x+w/2-3,y+h-6,6,6); }
   ctx.fillStyle='#05060f';ctx.fillRect(x+9,y+6,5,5);ctx.fillRect(x+w-14,y+6,5,5);
 }
 function draw(){
   ctx.fillStyle='#05060f';ctx.fillRect(0,0,W,H);
+  ctx.save();
+  if(shake>0.3)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
   // stars
   ctx.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<50;i++)ctx.fillRect((i*113)%W,(i*71)%H,1.5,1.5);
   // bunkers
   for(const b of bunkers)for(const blk of b){if(blk.hp<=0)continue;
     ctx.fillStyle=blk.hp===3?'#5fffac':blk.hp===2?'#ffd35f':'#ff5f6d';ctx.fillRect(blk.x,blk.y,9,9);}
   for(const a of aliens)if(a.alive)drawAlien(a);
+  // UFO
   if(ufo){ctx.fillStyle='#ff5fd0';ctx.beginPath();ctx.ellipse(ufo.x+ufo.w/2,ufo.y+ufo.h/2,ufo.w/2,ufo.h/2,0,0,7);ctx.fill();
-    ctx.fillStyle='#fff';ctx.fillRect(ufo.x+10,ufo.y-4,ufo.w-20,6);}
-  // ship
-  ctx.fillStyle='#5fffac';ctx.fillRect(ship.x,ship.y+6,ship.w,ship.h-6);
-  ctx.fillRect(ship.x+ship.w/2-3,ship.y,6,8);
-  ctx.fillStyle='#aef';ctx.fillRect(ship.x+ship.w/2-2,ship.y+2,4,4);
+    ctx.fillStyle='#fff';ctx.fillRect(ufo.x+10,ufo.y-4,ufo.w-20,6);
+    ctx.fillStyle='#ffb8de';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText('?',ufo.x+ufo.w/2,ufo.y+ufo.h+10);}
+  // 파워업 낙하
+  for(const pu of powerups){ const c=pu.kind==='rapid'?'#ffd35f':pu.kind==='triple'?'#5fd0ff':'#5fffac';
+    ctx.fillStyle=c;ctx.fillRect(pu.x-8,pu.y-8,16,16);
+    ctx.fillStyle='#05060f';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(pu.kind==='rapid'?'R':pu.kind==='triple'?'3':'S',pu.x,pu.y+1);ctx.textBaseline='alphabetic'; }
+  // ship (무적 시 깜빡임)
+  if(!(ship.inv>0&&Math.floor(ship.inv/4)%2===0)){
+    ctx.fillStyle='#5fffac';ctx.fillRect(ship.x,ship.y+6,ship.w,ship.h-6);
+    ctx.fillRect(ship.x+ship.w/2-3,ship.y,6,8);
+    ctx.fillStyle='#aef';ctx.fillRect(ship.x+ship.w/2-2,ship.y+2,4,4);
+  }
+  if(ship.shield){ ctx.strokeStyle='rgba(95,208,255,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ship.x+ship.w/2,ship.y+ship.h/2,ship.w*0.72,0,7);ctx.stroke(); }
   // bullets
   ctx.fillStyle='#fff';for(const b of pBullets)ctx.fillRect(b.x-1.5,b.y-8,3,10);
   ctx.fillStyle='#ff7b7b';for(const b of eBullets)ctx.fillRect(b.x-1.5,b.y,3,9);
   for(const p of particles){ctx.globalAlpha=p.life/18;ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);}
   ctx.globalAlpha=1;
+  // 점수 팝업
+  ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  for(const pp of pops){ctx.globalAlpha=Math.min(1,pp.life/50);ctx.fillStyle=pp.col;ctx.fillText(pp.txt,pp.x,pp.y);}
+  ctx.globalAlpha=1;
+  ctx.restore();
+  // 파워업 잔여시간 바
+  if(ship.power&&ship.powerT>0){ const w=120,x=W/2-w/2,y=H-14;
+    ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(x-2,y-2,w+4,8);
+    ctx.fillStyle=ship.power==='rapid'?'#ffd35f':'#5fd0ff';ctx.fillRect(x,y,w*(ship.powerT/600),4);
+    ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText(powerName(ship.power),W/2,y-5); }
 }
 function loop(){if(state==='play'){update();if(state==='play')draw();}requestAnimationFrame(loop);}
 ctx.fillStyle='#05060f';ctx.fillRect(0,0,W,H);
