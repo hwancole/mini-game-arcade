@@ -4,7 +4,12 @@
    - 동적: window.t(ko, en) 사용
    - 공통 버튼/난이도/제목 등은 사전(DICT/TITLES)으로 자동 번역 (게임별 수정 불필요) */
 (function(){
-  let lang='ko'; try{ lang=localStorage.getItem('arcade_lang')||'ko'; }catch(e){}
+  // 언어 결정: URL ?lang= → localStorage → 기본 ko
+  // (file://에서 localStorage가 페이지 간 공유 안 되는 경우에도 URL 파라미터로 확실히 전달)
+  function urlLang(){ try{ return new URLSearchParams(location.search).get('lang'); }catch(e){ return null; } }
+  let lang = urlLang();
+  if(lang!=='ko' && lang!=='en'){ try{ lang=localStorage.getItem('arcade_lang')||'ko'; }catch(e){ lang='ko'; } }
+  try{ localStorage.setItem('arcade_lang',lang); }catch(e){} // 다음 페이지를 위해 저장
   window.I18N_LANG=lang;
   window.t=function(ko,en){ return lang==='en'?en:ko; };
 
@@ -49,6 +54,13 @@
     root=root||document;
     root.querySelectorAll('[data-ko][data-en]').forEach(el=>{
       el.textContent = lang==='en' ? el.getAttribute('data-en') : el.getAttribute('data-ko');
+    });
+    // 메인으로/홈 링크에 현재 언어를 실어, 돌아가도 언어 유지
+    document.querySelectorAll('a[href]').forEach(a=>{
+      const h=a.getAttribute('href');
+      if(h && h.indexOf('index.html')!==-1 && h.indexOf('lang=')===-1){
+        a.setAttribute('href', h+(h.indexOf('?')>=0?'&':'?')+'lang='+lang);
+      }
     });
     if(lang!=='en') return; // 한국어는 원문 유지
     root.querySelectorAll('.btn, a.btn, .topbar a, .opt, .mode, .diff, .d, .cat-title, .rbtn span, h1, .overlay h2').forEach(el=>{

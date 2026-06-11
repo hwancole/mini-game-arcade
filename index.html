@@ -176,10 +176,13 @@ function applyLang(lang){
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-ko]').forEach(el=>{ el.textContent = el.getAttribute('data-'+lang); });
   document.querySelectorAll('.lang-switch button').forEach(b=>b.classList.toggle('active', b.dataset.lang===lang));
+  // 카드 링크에 현재 언어를 실어, 게임에서도 즉시 적용 (localStorage 공유 안 돼도 동작)
+  document.querySelectorAll('.card').forEach(a=>{ const base=a.getAttribute('href').split('?')[0]; a.setAttribute('href', base+'?lang='+lang); });
   try{ localStorage.setItem('arcade_lang', lang); }catch(e){}
 }
 document.querySelectorAll('.lang-switch button').forEach(b=>b.onclick=()=>applyLang(b.dataset.lang));
-let saved='ko'; try{ saved=localStorage.getItem('arcade_lang')||'ko'; }catch(e){}
+let saved='ko';
+try{ const u=new URLSearchParams(location.search).get('lang'); saved=(u==='ko'||u==='en')?u:(localStorage.getItem('arcade_lang')||'ko'); }catch(e){}
 applyLang(saved);
 
 // stars
