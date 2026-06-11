@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>♟️ 체스</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#15171c;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:640px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#c9a36a;text-decoration:none;font-weight:bold}
+  #status{font-size:1.05rem;font-weight:bold;margin:4px;height:24px;text-align:center}
+  .captured{display:flex;gap:1px;min-height:24px;font-size:1.3rem;width:min(94vw,520px);flex-wrap:wrap;line-height:1}
+  #board{display:grid;grid-template-columns:repeat(8,1fr);width:min(94vw,520px);aspect-ratio:1;
+    border:3px solid #5a4632;border-radius:4px;touch-action:manipulation;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .sq{display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;
+    font-size:min(8.5vw,46px);line-height:1}
+  .sq.light{background:#ecd9b6}.sq.dark{background:#b07d4f}
+  .sq.sel{background:#7fd17f!important}
+  .sq.last{box-shadow:inset 0 0 0 4px rgba(255,221,90,.7)}
+  .sq.check{background:radial-gradient(circle,#ff5f5f,#c03030)!important}
+  .sq .dot{position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(40,80,40,.55)}
+  .sq.cap .dot{width:88%;height:88%;background:none;border:4px solid rgba(40,120,40,.6);border-radius:50%}
+  .sq .pc{pointer-events:none}
+  .sq .pc.w{color:#fff;text-shadow:0 1px 2px #000,0 0 2px #000}
+  .sq .pc.b{color:#1a1a1a;text-shadow:0 1px 1px rgba(255,255,255,.3)}
+  .toolbar{display:flex;gap:8px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .btn{background:#c9a36a;color:#2a2012;border:none;padding:9px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:.9rem}
+  .btn.alt{background:#2c2f36;color:#eee}
+  .btn:disabled{opacity:.4}
+  #moves{width:min(94vw,520px);max-height:90px;overflow-y:auto;background:rgba(255,255,255,.05);border-radius:8px;
+    padding:6px 10px;font-size:.82rem;line-height:1.7;color:#cbd;margin-top:4px}
+  #moves b{color:#888;margin-right:4px}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(8,9,12,.94);text-align:center;gap:14px;z-index:20;padding:20px}
+  .overlay.hidden{display:none}.overlay h2{color:#c9a36a;font-size:1.8rem}
+  .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:9px 16px;border:2px solid #555;border-radius:10px;cursor:pointer;font-weight:bold;color:#eee}
+  .opt.sel{border-color:#c9a36a;background:rgba(201,163,106,.2)}
+  .row{display:flex;flex-direction:column;gap:6px;align-items:center}
+  .row .lbl{font-size:.82rem;color:#9aa}
+  label.chk{font-size:.85rem;color:#cbd;display:flex;align-items:center;gap:6px;cursor:pointer}
+  #promo{display:flex;gap:6px}
+  #promo .opt{font-size:2rem;padding:8px 12px}
+  .hint{font-size:.78rem;color:#778;text-align:center;padding:0 16px;max-width:520px;line-height:1.5}
+  #loadErr{color:#ff8f8f;font-size:.9rem;line-height:1.7}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"
+  onerror="(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chess.js@0.10.3/chess.js';document.head.appendChild(s);})()"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>♟️ 체스</b><span></span></div>
+<div id="status">로딩 중...</div>
+<div class="captured" id="capTop"></div>
+<div id="board"></div>
+<div class="captured" id="capBot"></div>
+<div class="toolbar">
+  <button class="btn" id="undoBtn">↩ 무르기</button>
+  <button class="btn alt" id="newBtn">🔄 새 게임</button>
+  <button class="btn alt" id="flipBtn">🔃 보드 회전</button>
+  <button class="btn alt" id="menuBtn">⚙️ 모드</button>
+</div>
+<div id="moves"></div>
+<p class="hint">유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
+
+<div class="overlay" id="startScreen">
+  <h2>♟️ 체스</h2>
+  <div id="loadErr"></div>
+  <div class="opts" id="modeOpts">
+    <div class="opt sel" data-mode="ai">🤖 AI 대전</div>
+    <div class="opt" data-mode="2p">👥 2인 플레이</div>
+  </div>
+  <div class="row" id="sideWrap">
+    <div class="lbl">내 진영</div>
+    <div class="opts">
+      <div class="opt sel" data-side="w">⚪ 백 (선공)</div>
+      <div class="opt" data-side="b">⚫ 흑</div>
+    </div>
+  </div>
+  <div class="row" id="diffWrap">
+    <div class="lbl">난이도</div>
+    <div class="opts">
+      <div class="opt" data-diff="easy">쉬움</div>
+      <div class="opt sel" data-diff="normal">보통</div>
+      <div class="opt" data-diff="hard">어려움</div>
+    </div>
+  </div>
+  <label class="chk" id="rotWrap"><input type="checkbox" id="rotChk"> 2인 플레이 시 매 턴 보드 자동 회전</label>
+  <button class="btn" id="startBtn" style="padding:12px 30px">시작 ▶</button>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <h2 id="endTitle"></h2>
+  <p id="endSub" style="color:#9aa"></p>
+  <button class="btn" id="againBtn">🔄 다시</button>
+  <button class="btn alt" id="endMenuBtn">모드 변경</button>
+</div>
+<div class="overlay hidden" id="promoScreen">
+  <h2>승급할 기물 선택</h2>
+  <div id="promo"></div>
+</div>
+
+<script>
+const GLYPH={w:{k:'♔',q:'♕',r:'♖',b:'♗',n:'♘',p:'♙'},b:{k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'}};
+const PVAL={p:100,n:320,b:330,r:500,q:900,k:0};
+// piece-square tables (board() 순서: index 0 = a8 ... 63 = h1, 즉 r*8+c, r=0이 8랭크)
+const PST={
+  p:[0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5,
+     0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+  n:[-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30,
+     -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+  b:[-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10,
+     -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+  r:[0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5,
+     -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+  q:[-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5,
+     0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+  k:[-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30,
+     -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20]
+};
+
+let Game, game, mode='ai', mySide='w', diff='normal', orient='w', rotate=false;
+let state='menu', sel=null, legalForSel=[], pendingPromo=null, lastMove=null, thinking=false;
+const boardEl=document.getElementById('board'), statusEl=document.getElementById('status');
+
+// ---- chess.js 로더 (CDN 장애 대비) ----
+(function waitLib(t){
+  if(window.Chess){ Game=window.Chess; document.getElementById('loadErr').textContent=''; statusEl.textContent=''; return; }
+  if(t>60){ document.getElementById('loadErr').innerHTML='⚠️ 체스 규칙 엔진(chess.js)을 불러오지 못했습니다.<br>네트워크를 확인하거나, chess.js 파일을 games/ 폴더에 받아 두면 오프라인에서도 동작합니다.'; statusEl.textContent='엔진 로드 실패'; return; }
+  setTimeout(()=>waitLib(t+1),100);
+})(0);
+
+// ---- 메뉴 ----
+document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{
+  selOne('#modeOpts',o);mode=o.dataset.mode;
+  document.getElementById('sideWrap').style.display=mode==='ai'?'flex':'none';
+  document.getElementById('diffWrap').style.display=mode==='ai'?'flex':'none';
+  document.getElementById('rotWrap').style.display=mode==='2p'?'flex':'none';});
+document.querySelectorAll('#sideWrap .opt').forEach(o=>o.onclick=()=>{selOne('#sideWrap',o);mySide=o.dataset.side;});
+document.querySelectorAll('#diffWrap .opt').forEach(o=>o.onclick=()=>{selOne('#diffWrap',o);diff=o.dataset.diff;});
+function selOne(sel,o){document.querySelectorAll(sel+' .opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');}
+document.getElementById('rotWrap').style.display='none';
+document.getElementById('startBtn').onclick=start;
+document.getElementById('newBtn').onclick=start;
+document.getElementById('againBtn').onclick=start;
+document.getElementById('menuBtn').onclick=()=>showMenu();
+document.getElementById('endMenuBtn').onclick=()=>showMenu();
+document.getElementById('flipBtn').onclick=()=>{orient=orient==='w'?'b':'w';render();};
+document.getElementById('undoBtn').onclick=undo;
+
+function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');}
+
+function start(){
+  if(!Game){return;}
+  game=new Game();
+  rotate=document.getElementById('rotChk').checked;
+  orient = mode==='ai' ? mySide : 'w';
+  sel=null;legalForSel=[];lastMove=null;pendingPromo=null;thinking=false;state='play';
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+  buildBoard();render();
+  if(mode==='ai' && game.turn()!==mySide) setTimeout(aiMove,300);
+}
+
+// ---- 보드 빌드/렌더 ----
+function buildBoard(){
+  boardEl.innerHTML='';
+  for(let i=0;i<64;i++){const d=document.createElement('div');d.className='sq';d.dataset.i=i;d.onclick=()=>onSquare(i);boardEl.appendChild(d);}
+}
+function cellToRC(cellIndex){ // 화면 셀(0=좌상) → board() 좌표(r,c)
+  const dr=Math.floor(cellIndex/8), dc=cellIndex%8;
+  if(orient==='w') return [dr,dc];
+  return [7-dr,7-dc];
+}
+function sqName(r,c){return 'abcdefgh'[c]+(8-r);}
+function nameToRC(name){return [8-parseInt(name[1]), 'abcdefgh'.indexOf(name[0])];}
+
+function render(){
+  const b=game.board();
+  const checkColor=game.in_check()?game.turn():null;
+  let kingSq=null;
+  if(checkColor){for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(p&&p.type==='k'&&p.color===checkColor)kingSq=sqName(r,c);}}
+  const cells=boardEl.children;
+  for(let i=0;i<64;i++){
+    const [r,c]=cellToRC(i), sqn=sqName(r,c), p=b[r][c], cell=cells[i];
+    cell.className='sq '+(((r+c)%2===0)?'light':'dark');
+    cell.innerHTML='';
+    if(p){const s=document.createElement('span');s.className='pc '+p.color;s.textContent=GLYPH[p.color][p.type];cell.appendChild(s);}
+    if(sel===sqn)cell.classList.add('sel');
+    if(lastMove&&(lastMove.from===sqn||lastMove.to===sqn))cell.classList.add('last');
+    if(kingSq===sqn)cell.classList.add('check');
+    if(legalForSel.includes(sqn)){const dot=document.createElement('div');dot.className='dot';cell.appendChild(dot);if(p)cell.classList.add('cap');}
+  }
+  renderCaptured();renderMoves();updateStatus();
+}
+function updateStatus(){
+  if(thinking){statusEl.innerHTML='🤖 AI가 생각 중...';return;}
+  const turnTxt=game.turn()==='w'?'⚪ 백':'⚫ 흑';
+  let s=turnTxt+' 차례';
+  if(mode==='ai')s+=game.turn()===mySide?' (당신)':' (AI)';
+  if(game.in_check())s+=' · 체크!';
+  statusEl.textContent=s;
+}
+function renderCaptured(){
+  const hist=game.history({verbose:true});
+  const capByWhite=[], capByBlack=[];
+  for(const m of hist){ if(m.captured){ (m.color==='w'?capByWhite:capByBlack).push(GLYPH[m.color==='w'?'b':'w'][m.captured]); } }
+  // 상단=화면 위쪽 진영이 잡은 것
+  const topIsWhite = orient==='b';
+  document.getElementById('capTop').textContent=(topIsWhite?capByWhite:capByBlack).join('');
+  document.getElementById('capBot').textContent=(topIsWhite?capByBlack:capByWhite).join('');
+}
+function renderMoves(){
+  const h=game.history();
+  let html='';
+  for(let i=0;i<h.length;i+=2){ html+=`<b>${i/2+1}.</b>${h[i]||''} ${h[i+1]||''} `; }
+  const el=document.getElementById('moves');el.innerHTML=html;el.scrollTop=el.scrollHeight;
+}
+
+// ---- 입력 ----
+function onSquare(i){
+  if(state!=='play'||thinking)return;
+  if(mode==='ai'&&game.turn()!==mySide)return;
+  const [r,c]=cellToRC(i), sqn=sqName(r,c), p=game.get(sqn);
+  if(sel){
+    if(legalForSel.includes(sqn)){ doMove(sel,sqn); return; }
+    // 다른 내 기물 선택
+    if(p&&p.color===game.turn()){ selectSquare(sqn); return; }
+    sel=null;legalForSel=[];render();return;
+  }
+  if(p&&p.color===game.turn()) selectSquare(sqn);
+}
+function selectSquare(sqn){
+  sel=sqn;
+  legalForSel=game.moves({square:sqn,verbose:true}).map(m=>m.to);
+  render();
+}
+function doMove(from,to){
+  // 승급 여부 확인
+  const piece=game.get(from);
+  const isPromo = piece&&piece.type==='p' && (to[1]==='8'||to[1]==='1');
+  if(isPromo){ pendingPromo={from,to}; showPromo(); return; }
+  applyMove({from,to});
+}
+function showPromo(){
+  const color=game.turn();
+  const div=document.getElementById('promo');div.innerHTML='';
+  [['q','퀸'],['r','룩'],['b','비숍'],['n','나이트']].forEach(([t])=>{
+    const b=document.createElement('div');b.className='opt';b.textContent=GLYPH[color][t];
+    b.onclick=()=>{document.getElementById('promoScreen').classList.add('hidden');applyMove({from:pendingPromo.from,to:pendingPromo.to,promotion:t});pendingPromo=null;};
+    div.appendChild(b);
+  });
+  document.getElementById('promoScreen').classList.remove('hidden');
+}
+function applyMove(m){
+  const res=game.move(m);
+  if(!res){sel=null;legalForSel=[];render();return;}
+  lastMove={from:res.from,to:res.to};sel=null;legalForSel=[];
+  if(mode==='2p'&&rotate)orient=game.turn();
+  render();
+  if(checkEnd())return;
+  if(mode==='ai'&&game.turn()!==mySide) setTimeout(aiMove,260);
+}
+function checkEnd(){
+  if(!game.game_over())return false;
+  state='over';
+  let title='',sub='';
+  if(game.in_checkmate()){const loser=game.turn();const winner=loser==='w'?'흑':'백';
+    title='체크메이트!';
+    if(mode==='ai')title = (loser===mySide)?'😢 패배 (체크메이트)':'🏆 승리! (체크메이트)';
+    else title=`${winner} 승리! (체크메이트)`;
+  } else if(game.in_stalemate()){title='무승부 — 스테일메이트';}
+  else if(game.in_threefold_repetition&&game.in_threefold_repetition()){title='무승부 — 3회 반복';}
+  else if(game.insufficient_material&&game.insufficient_material()){title='무승부 — 기물 부족';}
+  else title='무승부';
+  document.getElementById('endTitle').textContent=title;
+  document.getElementById('endSub').textContent=sub;
+  document.getElementById('endScreen').classList.remove('hidden');
+  return true;
+}
+function undo(){
+  if(state!=='play'||thinking||game.history().length===0)return;
+  game.undo();
+  if(mode==='ai'&&game.history().length>0&&game.turn()!==mySide)game.undo();
+  const h=game.history({verbose:true});lastMove=h.length?{from:h[h.length-1].from,to:h[h.length-1].to}:null;
+  sel=null;legalForSel=[];if(mode==='2p'&&rotate)orient=game.turn();render();
+}
+
+// ================= AI =================
+function evalBoard(){
+  const b=game.board();let s=0;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=b[r][c];if(!p)continue;
+    const idx=r*8+c, mirror=(7-r)*8+c;
+    if(p.color==='w') s+= PVAL[p.type]+PST[p.type][idx];
+    else s-= PVAL[p.type]+PST[p.type][mirror];
+  }
+  return s;
+}
+function orderMoves(moves){ return moves.sort((a,b)=>(b.captured?PVAL[b.captured]:0)-(a.captured?PVAL[a.captured]:0)); }
+let deadline=0;
+function leafEval(depth){
+  if(game.in_checkmate())return game.turn()==='w'?-1e6-depth:1e6+depth;
+  if(game.in_draw()||game.in_stalemate())return 0;
+  return evalBoard();
+}
+function minimax(depth,alpha,beta){
+  if(depth===0||game.game_over())return leafEval(depth);
+  if(performance.now()>deadline)return evalBoard();
+  const moves=orderMoves(game.moves({verbose:true}));
+  if(game.turn()==='w'){let best=-Infinity;
+    for(const m of moves){game.move(m);best=Math.max(best,minimax(depth-1,alpha,beta));game.undo();
+      if(best>alpha)alpha=best;if(alpha>=beta)break;if(performance.now()>deadline)break;}
+    return best;
+  } else {let best=Infinity;
+    for(const m of moves){game.move(m);best=Math.min(best,minimax(depth-1,alpha,beta));game.undo();
+      if(best<beta)beta=best;if(alpha>=beta)break;if(performance.now()>deadline)break;}
+    return best;
+  }
+}
+function aiMove(){
+  if(state!=='play')return;
+  thinking=true;render();
+  setTimeout(()=>{
+    const depth={easy:1,normal:2,hard:3}[diff];
+    deadline=performance.now()+1900;
+    const moves=orderMoves(game.moves({verbose:true}));
+    const white=game.turn()==='w';
+    let best=moves[0],bestV=white?-Infinity:Infinity;
+    for(const m of moves){
+      game.move(m);const v=minimax(depth-1,-Infinity,Infinity);game.undo();
+      if(white?v>bestV:v<bestV){bestV=v;best=m;}
+    }
+    // 쉬움: 가끔 차선책으로 약하게
+    if(diff==='easy'&&moves.length>3&&Math.random()<0.35){best=moves[Math.floor(Math.random()*Math.min(5,moves.length))];}
+    thinking=false;
+    if(best){game.move(best);lastMove={from:best.from,to:best.to};if(mode==='2p'&&rotate)orient=game.turn();render();checkEnd();}
+    else render();
+  },60);
+}
+showMenu();
+</script>
+</body>
+</html>

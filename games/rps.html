@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>✊ 가위바위보</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#16121e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ff5f9f;text-decoration:none;font-weight:bold}
+  h1{margin:6px;color:#ff5f9f;font-size:1.5rem}
+  .modes{display:flex;gap:10px;margin:8px}
+  .mode{padding:8px 18px;border:2px solid #444;border-radius:10px;cursor:pointer;font-weight:bold;font-size:.9rem;text-align:center}
+  .mode.sel{border-color:#ff5f9f;background:rgba(255,95,159,.18)}
+  .mode small{display:block;font-size:.68rem;color:#9aa;font-weight:normal;margin-top:2px}
+  .arena{display:flex;align-items:center;justify-content:center;gap:14px;margin:18px 0 6px;width:100%;max-width:520px}
+  .side{flex:1;text-align:center}
+  .side .who{font-size:.9rem;color:#9aa;margin-bottom:6px}
+  .hand{font-size:clamp(3.5rem,18vw,6rem);line-height:1.1;min-height:1.1em;transition:transform .1s}
+  .hand.shake{animation:shake .5s}
+  @keyframes shake{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-14px) rotate(-8deg)}75%{transform:translateY(-14px) rotate(8deg)}}
+  .hand.pop{animation:pop .35s}
+  @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+  .vs{font-size:1.4rem;font-weight:900;color:#666}
+  #result{height:42px;font-size:1.8rem;font-weight:900;margin:4px;transition:.2s}
+  #result.win{color:#5fffac}#result.lose{color:#ff5f6d}#result.draw{color:#ffd35f}
+  #result.show{animation:rpop .4s}
+  @keyframes rpop{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
+  .buttons{display:flex;gap:14px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .rbtn{width:96px;height:96px;border:3px solid #3a3050;border-radius:20px;background:#221a33;cursor:pointer;
+    font-size:3rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:.12s;-webkit-tap-highlight-color:transparent}
+  .rbtn span{font-size:.7rem;color:#9aa;font-weight:bold}
+  .rbtn:active{transform:scale(.92)}
+  .rbtn:hover{border-color:#ff5f9f}
+  .rbtn:disabled{opacity:.5}
+  .scoreboard{display:flex;gap:10px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .sc{background:rgba(255,255,255,.06);border-radius:12px;padding:8px 16px;text-align:center;min-width:64px}
+  .sc .v{font-size:1.4rem;font-weight:900}.sc .l{font-size:.7rem;color:#9aa}
+  .sc.win .v{color:#5fffac}.sc.draw .v{color:#ffd35f}.sc.lose .v{color:#ff5f6d}.sc.streak .v{color:#ff9f5f}
+  .lifetime{font-size:.82rem;color:#9aa;margin:6px;text-align:center;line-height:1.6}
+  .reset{background:none;border:1px solid #444;color:#9aa;border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.8rem;margin-top:4px}
+  .hint{color:#778;font-size:.8rem;text-align:center;padding:8px 16px;max-width:520px;line-height:1.6}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+</head>
+<body>
+<div class="topbar"><a href="../index.html">← 메인으로</a><b>✊ 가위바위보</b><span></span></div>
+<h1>가위바위보 vs AI</h1>
+<div class="modes">
+  <div class="mode sel" data-m="random">🎲 랜덤 모드<small>AI가 무작위로 냄</small></div>
+  <div class="mode" data-m="learn">🧠 학습 모드<small>내 패턴을 학습해 예측</small></div>
+</div>
+
+<div class="arena">
+  <div class="side"><div class="who">나</div><div class="hand" id="myHand">❔</div></div>
+  <div class="vs">VS</div>
+  <div class="side"><div class="who">AI 🤖</div><div class="hand" id="aiHand">❔</div></div>
+</div>
+<div id="result"></div>
+
+<div class="buttons">
+  <button class="rbtn" data-move="2">✌️<span>가위</span></button>
+  <button class="rbtn" data-move="0">✊<span>바위</span></button>
+  <button class="rbtn" data-move="1">🖐️<span>보</span></button>
+</div>
+
+<div class="scoreboard">
+  <div class="sc win"><div class="v" id="sW">0</div><div class="l">승</div></div>
+  <div class="sc draw"><div class="v" id="sD">0</div><div class="l">무</div></div>
+  <div class="sc lose"><div class="v" id="sL">0</div><div class="l">패</div></div>
+  <div class="sc streak"><div class="v" id="sStreak">0</div><div class="l">🔥 연승</div></div>
+</div>
+
+<div class="lifetime" id="lifetime"></div>
+<button class="reset" id="resetBtn">통산 전적·학습 초기화</button>
+<p class="hint">학습 모드 AI는 당신이 <b>직전에 낸 손 뒤에 무엇을 내는지</b>의 패턴(최근 2수까지)을 기록해 다음 수를 예측하고 카운터를 냅니다. 게임이 쌓일수록 강해집니다. (기록·학습은 이 기기에만 저장됩니다)</p>
+
+<script>
+const NAMES=['바위','보','가위'], EMOJI=['✊','🖐️','✌️']; // 0=rock,1=paper,2=scissors
+let mode='random';
+let session={w:0,d:0,l:0,streak:0};
+let history=[];           // 플레이어가 낸 손 기록
+let model=load('rps_model',{o1:{},o2:{}});   // 학습 모델 (order-1, order-2 전이표)
+let record=load('rps_record',{w:0,d:0,l:0,games:0});
+let busy=false;
+
+function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
+  document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.m;});
+
+// === 학습 AI ===
+// 모델: o1[lastMove] = [c0,c1,c2] (그 다음 낸 손 횟수), o2["a,b"] = [...]
+function recordPattern(move){
+  if(history.length>=1){const k=history[history.length-1];(model.o1[k]=model.o1[k]||[0,0,0])[move]++;}
+  if(history.length>=2){const k=history[history.length-2]+','+history[history.length-1];(model.o2[k]=model.o2[k]||[0,0,0])[move]++;}
+  save('rps_model',model);
+}
+function predictPlayer(){
+  // 최근 2수 → order-2, 없으면 order-1, 없으면 전체 빈도, 없으면 랜덤
+  if(history.length>=2){
+    const k=history[history.length-2]+','+history[history.length-1];
+    const c=model.o2[k];
+    if(c){const t=c[0]+c[1]+c[2]; if(t>=2)return argmax(c);}
+  }
+  if(history.length>=1){
+    const c=model.o1[history[history.length-1]];
+    if(c){const t=c[0]+c[1]+c[2]; if(t>=2)return argmax(c);}
+  }
+  // 전체 빈도
+  const all=[0,0,0]; history.forEach(m=>all[m]++);
+  if(history.length>=3)return argmax(all);
+  return Math.floor(Math.random()*3);
+}
+function argmax(a){let bi=0;for(let i=1;i<3;i++)if(a[i]>a[bi])bi=i;
+  // 동점이면 무작위
+  const max=a[bi], ties=[0,1,2].filter(i=>a[i]===max);
+  return ties[Math.floor(Math.random()*ties.length)];}
+
+function aiMove(){
+  if(mode==='random')return Math.floor(Math.random()*3);
+  const pred=predictPlayer();      // 플레이어가 낼 것으로 예측
+  return (pred+1)%3;               // 그것을 이기는 손 (counter)
+}
+
+// === 게임 ===
+const myHand=document.getElementById('myHand'), aiHand=document.getElementById('aiHand'), resultEl=document.getElementById('result');
+document.querySelectorAll('.rbtn').forEach(b=>b.onclick=()=>play(+b.dataset.move));
+
+function play(myMove){
+  if(busy)return; busy=true;
+  const ai=aiMove();
+  // 흔드는 애니메이션
+  resultEl.textContent='';resultEl.className='';
+  myHand.textContent='✊';aiHand.textContent='✊';
+  myHand.classList.add('shake');aiHand.classList.add('shake');
+  setTimeout(()=>{
+    myHand.classList.remove('shake');aiHand.classList.remove('shake');
+    myHand.textContent=EMOJI[myMove];aiHand.textContent=EMOJI[ai];
+    myHand.classList.add('pop');aiHand.classList.add('pop');
+    setTimeout(()=>{myHand.classList.remove('pop');aiHand.classList.remove('pop');},350);
+    judge(myMove,ai);
+    // 학습 (예측에 사용된 컨텍스트로 기록 후 history 갱신)
+    recordPattern(myMove);
+    history.push(myMove); if(history.length>200)history.shift();
+    busy=false;
+  },520);
+}
+
+function judge(my,ai){
+  const out=(my-ai+3)%3; // 0=무, 1=내가 이김, 2=AI가 이김
+  let txt,cls;
+  if(out===0){txt='🤝 무승부';cls='draw';session.d++;record.d++;}
+  else if(out===1){txt='🎉 승리!';cls='win';session.w++;record.w++;session.streak++;}
+  else{txt='😢 패배';cls='lose';session.l++;record.l++;session.streak=0;}
+  record.games++;
+  resultEl.textContent=txt;resultEl.className=cls+' show';
+  setTimeout(()=>resultEl.classList.remove('show'),400);
+  updateUI();save('rps_record',record);
+}
+
+function updateUI(){
+  document.getElementById('sW').textContent=session.w;
+  document.getElementById('sD').textContent=session.d;
+  document.getElementById('sL').textContent=session.l;
+  document.getElementById('sStreak').textContent=session.streak;
+  const total=record.w+record.d+record.l;
+  const rate=total?Math.round(record.w/total*100):0;
+  document.getElementById('lifetime').innerHTML=
+    `📊 통산 전적: <b style="color:#5fffac">${record.w}</b>승 <b style="color:#ffd35f">${record.d}</b>무 <b style="color:#ff5f6d">${record.l}</b>패 · 승률 <b>${rate}%</b> (${total}판)`;
+}
+
+document.getElementById('resetBtn').onclick=()=>{
+  if(!confirm('통산 전적과 학습 데이터를 모두 초기화할까요?'))return;
+  model={o1:{},o2:{}};record={w:0,d:0,l:0,games:0};history=[];
+  save('rps_model',model);save('rps_record',record);
+  session={w:0,d:0,l:0,streak:0};updateUI();
+  resultEl.textContent='초기화됨';resultEl.className='draw';myHand.textContent='❔';aiHand.textContent='❔';
+};
+updateUI();
+</script>
+</body>
+</html>
