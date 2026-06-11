@@ -31,7 +31,7 @@
   <canvas id="cv" width="900" height="500"></canvas>
   <div class="overlay" id="startScreen">
     <h2 data-ko="점프 어드벤처" data-en="Jump Adventure">점프 어드벤처</h2>
-    <p class="hint" data-ko="적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버." data-en="Stomp enemies, collect coins, and reach the flag! Fall in a pit or get hit by an enemy and it's game over.">적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버.</p>
+    <p class="hint" data-ko="적을 밟아 처치하고 코인을 모아 깃발까지! ? 블록에서 코인·🍄버섯이 나와요. 버섯을 먹으면 커져서 한 대 더 버팁니다. 총 5스테이지!" data-en="Stomp enemies, grab coins, reach the flag! ? blocks give coins or a 🍄mushroom. Grow big to survive one extra hit. 5 stages!">적을 밟아 처치하고 코인을 모아 깃발까지! ? 블록에서 코인·🍄버섯이 나와요. 버섯을 먹으면 커져서 한 대 더 버팁니다. 총 5스테이지!</p>
     <button class="btn" id="startBtn">시작 ▶</button>
     <p class="hint"><span data-ko="🖥️ PC:" data-en="🖥️ PC:">🖥️ PC:</span> <kbd>←</kbd><kbd>→</kbd> <span data-ko="이동 ·" data-en="move ·">이동 ·</span> <kbd>Space</kbd>/<kbd>↑</kbd> <span data-ko="점프(길게=높이) ·" data-en="jump (hold = higher) ·">점프(길게=높이) ·</span> <kbd>Shift</kbd> <span data-ko="달리기" data-en="run">달리기</span><br>
     <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>◀▶</b> <span data-ko="이동 · 오른쪽" data-en="move · right">이동 · 오른쪽</span> <b data-ko="점프/달리기" data-en="jump/run">점프/달리기</b> <span data-ko="버튼" data-en="buttons">버튼</span></p>
@@ -51,46 +51,102 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.h
 const hud=document.getElementById('hud');
 const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
 const T=40; // tile size
-// Level legend: # ground, = brick, ? question(coin), E enemy, C coin, F flag, P player start, ^ spike-ish (we use gaps)
+// 레전드: # 땅, = 벽돌, ? 코인블록, M 버섯블록, C 코인, E 적, F 깃발, P 시작
 const LEVELS=[
 [
-"                                                                                              ",
-"                                                                                              ",
-"                      C C C                                                                   ",
-"             ?                          =====                          C C                    ",
-"                            E                              ?                                   ",
-"                       ====            C C C        E              ===        ?         F      ",
-"      P            C        E                    ====                              =====       ",
-"   ==========    =====   =======     =========          ====   =========   ===================",
-"   ==========    =====   =======     =========          ====   =========   ===================",
+"                                                                                                           ",
+"                                                                                                           ",
+"               C  C  C                                          M                                          ",
+"         ?                          =====                                      ?                           ",
+"                                              C C C                                     C C                 ",
+"            ===           E                                       ===           E                          ",
+"     P    C        C           E         C             E                 C                         C   F   ",
+"  #############    #########    ###########    ##########    ###########    ##############    ############# ",
+"  #############    #########    ###########    ##########    ###########    ##############    ############# ",
 ],
 [
-"                                                                                              ",
-"            C C                            ? ?                                                 ",
-"                        =====                            C C C                                 ",
-"     ?            E              C C              E                  =====              F       ",
-"            ===        E              =====              E    C C          E       ====        ",
-"   P    C        ===          E              ===                    ===========================",
-"  =====     ===       =====        =====           ====    =====                               ",
-"  =====     ===       =====        =====           ====    =====               ===============",
-"  =====     ===       =====        =====           ====    =====               ===============",
+"                                                                                                           ",
+"             C C                            ? M ?                                         C C C             ",
+"                         =====                              C C C                                          ",
+"      ?            E               C C               E                   =====               E      F      ",
+"             ===         E              =====               E     C C           ===                        ",
+"   P     C        ===           E              ===                     C            E        C             ",
+"  ########    =====    ##########     ########     ##########    ##########    ###########    ############ ",
+"  ########    =====    ##########     ########     ##########    ##########    ###########    ############ ",
+"  ########    =====    ##########     ########     ##########    ##########    ###########    ############ ",
+],
+[
+"                                                                                                           ",
+"                      ? = ?                            C C C C                          M                   ",
+"           C C C                       =======                          =====                              ",
+"                          E                        E         E                    ?      C C               ",
+"       ===         C C          ===========                       ===        E             ===             ",
+"   P        E            C                     E         C C            E            C C            E   F    ",
+"  ######     #####   ########     ####     #########   ######    #######    ########     ################# ",
+"  ######     #####   ########     ####     #########   ######    #######    ########     ################# ",
+"  ######     #####   ########     ####     #########   ######    #######    ########     ################# ",
+],
+[
+"                                                                                                           ",
+"      C C            M           C C C C C                        ? ?                      C C C            ",
+"                  =======                        ======                       =======                      ",
+"           E              C C            E              E  E             C C            E         F         ",
+"     ===          ====          ===            ====            ===            ====           ====          ",
+"  P     C   E          C C            E   C           C C   E         C            E   C C          C       ",
+"  ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ################# ",
+"  ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ################# ",
+"  ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ####    ################# ",
+],
+[
+"                                                                                                           ",
+"   ? M ?              C C C C C              = = = =              M ? M              C C C C C        F      ",
+"               =====              ========              =====              =======              =====      ",
+"        E E            C C C             E E E              C C C             E E E            C C C         ",
+"   ===         ====           =====            ====            =====            ====           ====        ",
+"  P   C C C        E E    C C C       E E E       C C C    E E    C C C       E E E       C C C       C     ",
+"  #####    #####    ######    ######    ######    ######    ######    ######    ######    ################# ",
+"  #####    #####    ######    ######    ######    ######    ######    ######    ######    ################# ",
+"  #####    #####    ######    ######    ######    ######    ######    ######    ######    ################# ",
 ],
 ];
 
 let level=0, solids, coins, enemies, qblocks, flag, player, cam, state='menu', score, lives, levelTime;
+let items, pops, fx, coinsGot=0;
+
+// ---- 사운드 (WebAudio) ----
+let actx=null;
+function AC(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(f,f2,dur,type,vol,when){ const a=AC(); if(!a)return; const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t0); if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.1,t0); g.gain.exponentialRampToValueAtTime(0.0008,t0+dur); o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+dur); }
+function sfx(type){ switch(type){
+  case 'jump': tone(420,720,0.16,'square',0.1); break;
+  case 'coin': tone(988,1319,0.12,'square',0.1); break;
+  case 'stomp': tone(300,90,0.12,'square',0.12); break;
+  case 'bump': tone(180,120,0.08,'square',0.1); break;
+  case 'powerup': tone(523,784,0.1,'square',0.12); tone(659,988,0.14,'square',0.12,0.1); break;
+  case 'hurt': tone(400,120,0.22,'sawtooth',0.13); break;
+  case 'die': tone(330,80,0.5,'square',0.14); break;
+  case 'clear': [523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.13,i*0.12)); break;
+} }
+function popText(x,y,txt,col){ pops.push({x,y,txt,col:col||'#fff',life:50}); }
+function burst(x,y,col,n){ for(let i=0;i<(n||6);i++){const a=Math.random()*7;fx.push({x,y,vx:Math.cos(a)*(1+Math.random()*2),vy:Math.sin(a)*(1+Math.random()*2)-2,life:24,col});} }
+
+function spawnMushroom(x,y){ items.push({x:x+6,y,w:28,h:28,vx:1.6,vy:0,onGround:false}); }
 
 function parseLevel(idx){
-  const map=LEVELS[idx]; solids=[];coins=[];enemies=[];qblocks=[];
+  const map=LEVELS[idx]; solids=[];coins=[];enemies=[];qblocks=[];items=[];pops=[];fx=[];
   const rows=map.length;
   for(let r=0;r<rows;r++){
     for(let c=0;c<map[r].length;c++){
       const ch=map[r][c], x=c*T, y=r*T;
       if(ch==='#'||ch==='='){solids.push({x,y,w:T,h:T,brick:ch==='='});}
-      else if(ch==='?'){qblocks.push({x,y,w:T,h:T,used:false});}
+      else if(ch==='?'){qblocks.push({x,y,w:T,h:T,used:false,kind:'coin',bounce:0});}
+      else if(ch==='M'){qblocks.push({x,y,w:T,h:T,used:false,kind:'mushroom',bounce:0});}
       else if(ch==='C'){coins.push({x:x+10,y:y+8,w:20,h:24,got:false});}
-      else if(ch==='E'){enemies.push({x,y:y+8,w:30,h:30,vx:-1,vy:0,dead:0,alive:true});}
+      else if(ch==='E'){enemies.push({x,y:y+8,w:30,h:30,vx:-1,vy:0,dead:0,alive:true,squish:0,walk:0});}
       else if(ch==='F'){flag={x:x+10,y:y-T*4,w:8,h:T*5};}
-      else if(ch==='P'){player={x,y,w:28,h:36,vx:0,vy:0,onGround:false,face:1,jumpHold:0,dead:false,win:false};}
+      else if(ch==='P'){player={x,y,w:28,h:36,vx:0,vy:0,onGround:false,face:1,jumpHold:0,jumpWas:false,jumpBuf:0,coyote:0,dead:false,win:false,big:false,inv:0};}
     }
   }
   cam=0;
@@ -100,7 +156,7 @@ let keys={};
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowup','arrowleft','arrowright','arrowdown'].includes(e.key.toLowerCase()))e.preventDefault();});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
-function startGame(){level=0;score=0;lives=3;loadLevel();}
+function startGame(){level=0;score=0;lives=3;coinsGot=0;AC();loadLevel();}
 function loadLevel(){parseLevel(level);state='play';levelTime=300;startScreen.classList.add('hidden');endScreen.classList.add('hidden');}
 document.getElementById('startBtn').onclick=startGame;
 document.getElementById('restartBtn').onclick=startGame;
@@ -123,57 +179,73 @@ function update(){
   if(keys['arrowleft']){p.vx=-speed;p.face=-1;}
   else if(keys['arrowright']){p.vx=speed;p.face=1;}
   else p.vx*=0.6;
+  // 점프: 코요테 타임 + 입력 버퍼로 손맛 개선
   const jump=keys[' ']||keys['arrowup'];
-  if(jump&&p.onGround){p.vy=-9.5;p.jumpHold=1;p.onGround=false;}
+  if(jump&&!p.jumpWas)p.jumpBuf=6;
+  if(p.jumpBuf>0)p.jumpBuf--;
+  if(p.onGround)p.coyote=6; else if(p.coyote>0)p.coyote--;
+  if(p.jumpBuf>0&&(p.onGround||p.coyote>0)){ p.vy=-9.5;p.jumpHold=1;p.onGround=false;p.coyote=0;p.jumpBuf=0; sfx('jump'); }
   if(jump&&p.jumpHold>0&&p.jumpHold<10){p.vy-=0.55;p.jumpHold++;}
   if(!jump)p.jumpHold=0;
+  p.jumpWas=jump;
   p.vy+=0.55; if(p.vy>14)p.vy=14;
+  if(p.inv>0)p.inv--;
   p.bumped=null;
-  moveAndCollide(p,solids.concat(qblocks.filter(q=>true)));
-  // question block hit from below
+  moveAndCollide(p,solids.concat(qblocks));
+  // ? 블록을 아래에서 치면 코인/버섯이 나옴
   if(p.bumped){
     const q=qblocks.find(q=>q===p.bumped);
-    if(q&&!q.used){q.used=true;score+=200;hud.flash=1;}
+    if(q&&!q.used){ q.used=true; q.bounce=8; sfx('bump');
+      if(q.kind==='mushroom'){ spawnMushroom(q.x,q.y-T); }
+      else { score+=200; coinsGot++; burst(q.x+T/2,q.y,'#ffd700',8); popText(q.x,q.y-6,'+200','#ffd700'); sfx('coin'); }
+    }
   }
   if(p.x<0)p.x=0;
-  // camera
   cam=Math.max(0,Math.min(p.x-W/2.5, LEVELS[level][0].length*T - W));
-  // coins
-  for(const c of coins)if(!c.got&&aabb(p,c)){c.got=true;score+=100;}
-  // enemies
+  // 코인
+  for(const c of coins)if(!c.got&&aabb(p,c)){c.got=true;score+=100;coinsGot++;sfx('coin');burst(c.x+c.w/2,c.y+c.h/2,'#ffd700',5);popText(c.x,c.y,'+100','#ffd700');}
+  // 버섯 아이템 (물리 + 획득 → 커짐)
+  for(let i=items.length-1;i>=0;i--){ const m=items[i];
+    m.vy+=0.5; if(m.vy>12)m.vy=12; m.onGround=false;
+    m.x+=m.vx; for(const b of solids)if(aabb(m,b)){if(m.vx>0)m.x=b.x-m.w;else m.x=b.x+b.w;m.vx*=-1;}
+    m.y+=m.vy; for(const b of solids)if(aabb(m,b)){if(m.vy>0){m.y=b.y-m.h;m.vy=0;m.onGround=true;}else{m.y=b.y+b.h;m.vy=0;}}
+    if(aabb(p,m)){ grow(); items.splice(i,1); continue; }
+    if(m.y>H+100)items.splice(i,1);
+  }
+  // 적
   for(const e of enemies){
+    if(e.squish>0)e.squish--;
     if(!e.alive){e.dead++;continue;}
+    e.walk+=Math.abs(e.vx)*0.2;
     e.vy+=0.55; if(e.vy>14)e.vy=14;
-    // horizontal
     e.x+=e.vx;
     for(const b of solids){if(aabb(e,b)){if(e.vx>0)e.x=b.x-e.w;else e.x=b.x+b.w;e.vx*=-1;}}
     e.y+=e.vy;
     let grounded=false;
     for(const b of solids){if(aabb(e,b)){if(e.vy>0){e.y=b.y-e.h;e.vy=0;grounded=true;}else{e.y=b.y+b.h;e.vy=0;}}}
-    // turn around at ledges so enemies don't walk off platforms
-    if(grounded){
-      const probeX=e.vx>0?e.x+e.w+2:e.x-2, probeY=e.y+e.h+4;
-      let groundAhead=false;
-      for(const b of solids){if(probeX>b.x&&probeX<b.x+b.w&&probeY>b.y&&probeY<b.y+b.h){groundAhead=true;break;}}
-      if(!groundAhead)e.vx*=-1;
-    }
-    if(e.y>H+200){e.alive=false;}
-    // collide with player
+    if(grounded){ const probeX=e.vx>0?e.x+e.w+2:e.x-2, probeY=e.y+e.h+4; let ga=false;
+      for(const b of solids){if(probeX>b.x&&probeX<b.x+b.w&&probeY>b.y&&probeY<b.y+b.h){ga=true;break;}} if(!ga)e.vx*=-1; }
+    if(e.y>H+200)e.alive=false;
     if(aabb(p,e)){
-      if(p.vy>1 && p.y+p.h-e.y<20){e.alive=false;e.dead=1;p.vy=-7;score+=300;}
-      else{die();}
+      if(p.vy>1 && p.y+p.h-e.y<26){ e.alive=false;e.dead=1;e.squish=18;p.vy=-8;score+=200;burst(e.x+e.w/2,e.y,'#a55',8);popText(e.x,e.y,'+200','#fff');sfx('stomp'); }
+      else if(p.inv<=0){ if(p.big)shrink(); else die(); }
     }
   }
-  // fall in pit
+  // 점수 팝업 / 파티클
+  for(const pp of pops){pp.y-=0.6;pp.life--;}
+  pops=pops.filter(pp=>pp.life>0);
+  for(const f of fx){f.x+=f.vx;f.y+=f.vy;f.vy+=0.3;f.life--;}
+  fx=fx.filter(f=>f.life>0);
   if(p.y>H+60)die();
-  // flag win
-  if(flag&&aabb(p,flag)){winLevel();}
+  if(flag&&aabb(p,flag))winLevel();
   levelTime-=1/60; if(levelTime<=0)die();
-  hud.innerHTML=t(`💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · 스테이지 ${level+1}/${LEVELS.length}`,`💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · Stage ${level+1}/${LEVELS.length}`);
+  hud.innerHTML=t(`🪙 ${coinsGot} · 💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · 스테이지 ${level+1}/${LEVELS.length}`,`🪙 ${coinsGot} · 💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · Stage ${level+1}/${LEVELS.length}`);
 }
+function grow(){ if(player.big)return; player.big=true; const oh=player.h; player.h=48;player.w=32; player.y-=(48-oh); player.inv=40; sfx('powerup'); score+=1000; popText(player.x,player.y-10,'+1000','#5fffbc'); }
+function shrink(){ player.big=false; player.h=36;player.w=28; player.inv=100; sfx('hurt'); }
 
 function die(){
-  if(player.dead)return; player.dead=true; lives--;
+  if(player.dead)return; player.dead=true; lives--; sfx('die');
   setTimeout(()=>{
     if(lives<=0){state='over';showEnd(t('💀 게임 오버','💀 Game Over'),t(`최종 점수: <b>${score}</b>`,`Final score: <b>${score}</b>`));}
     else{loadLevel();}
@@ -182,7 +254,7 @@ function die(){
   player.vy=-8;
 }
 function winLevel(){
-  if(state!=='play')return;
+  if(state!=='play')return; sfx('clear');
   score+=Math.ceil(levelTime)*10+500;
   level++;
   if(level>=LEVELS.length){state='over';showEnd(t('🏆 클리어!','🏆 Cleared!'),t(`모든 스테이지 완료!<br>최종 점수: <b>${score}</b>`,`All stages complete!<br>Final score: <b>${score}</b>`));}
@@ -212,31 +284,50 @@ function draw(){
     ctx.strokeStyle='rgba(0,0,0,.25)';ctx.strokeRect(b.x+.5,b.y+.5,b.w-1,b.h-1);
     if(!b.brick){ctx.fillStyle='#4a8b2a';ctx.fillRect(b.x,b.y,b.w,8);}
   }
-  // ? blocks
+  // ? blocks (튕김 애니메이션, 버섯블록은 초록)
   for(const q of qblocks){
-    ctx.fillStyle=q.used?'#8a6d3b':'#f5b942';ctx.fillRect(q.x,q.y,q.w,q.h);
-    ctx.strokeStyle='#7a4a10';ctx.strokeRect(q.x+.5,q.y+.5,q.w-1,q.h-1);
-    if(!q.used){ctx.fillStyle='#7a4a10';ctx.font='bold 24px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('?',q.x+q.w/2,q.y+q.h/2);}
+    if(q.bounce>0)q.bounce-=0.6; const yo=-(q.bounce||0);
+    ctx.fillStyle=q.used?'#8a6d3b':(q.kind==='mushroom'?'#5fd06a':'#f5b942');
+    ctx.fillRect(q.x,q.y+yo,q.w,q.h);
+    ctx.strokeStyle='#7a4a10';ctx.strokeRect(q.x+.5,q.y+yo+.5,q.w-1,q.h-1);
+    if(!q.used){ctx.fillStyle='#7a4a10';ctx.font='bold 24px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.kind==='mushroom'?'M':'?',q.x+q.w/2,q.y+yo+q.h/2);}
   }
   // coins
   for(const c of coins){if(c.got)continue;ctx.fillStyle='#ffd700';ctx.beginPath();ctx.ellipse(c.x+c.w/2,c.y+c.h/2,c.w/2*Math.abs(Math.sin(Date.now()/200+c.x)),c.h/2,0,0,7);ctx.fill();ctx.strokeStyle='#b8860b';ctx.stroke();}
   // flag
   if(flag){ctx.fillStyle='#666';ctx.fillRect(flag.x,flag.y,6,flag.h);ctx.fillStyle='#5fffbc';ctx.beginPath();ctx.moveTo(flag.x+6,flag.y+6);ctx.lineTo(flag.x+40,flag.y+18);ctx.lineTo(flag.x+6,flag.y+30);ctx.fill();}
+  // 버섯 아이템
+  for(const m of items){
+    ctx.fillStyle='#f6dca0';ctx.fillRect(m.x+6,m.y+m.h*0.45,m.w-12,m.h*0.55);
+    ctx.fillStyle='#e23';ctx.beginPath();ctx.ellipse(m.x+m.w/2,m.y+m.h*0.45,m.w/2,m.h*0.45,0,Math.PI,0);ctx.fill();ctx.fillRect(m.x,m.y+m.h*0.4,m.w,4);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(m.x+9,m.y+8,3,0,7);ctx.arc(m.x+m.w-9,m.y+8,3,0,7);ctx.fill();
+  }
   // enemies
-  for(const e of enemies){if(!e.alive&&e.dead>1){continue;}
-    if(!e.alive){ctx.fillStyle='#a55';ctx.fillRect(e.x,e.y+18,e.w,12);continue;}
+  for(const e of enemies){
+    if(!e.alive){ if(e.squish>0){ctx.fillStyle='#8a4513';ctx.fillRect(e.x,e.y+e.h-7,e.w,7);} continue; }
+    const bob=Math.sin(e.walk)*1.5;
     ctx.fillStyle='#b5651d';ctx.beginPath();ctx.ellipse(e.x+e.w/2,e.y+e.h/2,e.w/2,e.h/2,0,0,7);ctx.fill();
     ctx.fillStyle='#fff';ctx.fillRect(e.x+6,e.y+8,6,6);ctx.fillRect(e.x+18,e.y+8,6,6);
     ctx.fillStyle='#000';ctx.fillRect(e.x+8,e.y+10,3,3);ctx.fillRect(e.x+20,e.y+10,3,3);
+    ctx.fillStyle='#5a2d0c';ctx.fillRect(e.x+4,e.y+e.h-3+bob,8,4);ctx.fillRect(e.x+e.w-12,e.y+e.h-3-bob,8,4);
   }
-  // player
+  // 파티클 + 점수 팝업
+  for(const f of fx){ctx.globalAlpha=Math.min(1,f.life/24);ctx.fillStyle=f.col;ctx.fillRect(f.x-2,f.y-2,4,4);}
+  ctx.globalAlpha=1;
+  ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+  for(const pp of pops){ctx.globalAlpha=Math.min(1,pp.life/50);ctx.fillStyle=pp.col;ctx.fillText(pp.txt,pp.x,pp.y);}
+  ctx.globalAlpha=1;
+  // player (큰/작은 상태 + 무적 깜빡임)
   const p=player;
-  ctx.save();ctx.translate(p.x+p.w/2,p.y+p.h/2);ctx.scale(p.face,1);
-  ctx.fillStyle='#e22';ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h*0.5); // shirt/hat
-  ctx.fillStyle='#39f';ctx.fillRect(-p.w/2,0,p.w,p.h*0.5); // overalls
-  ctx.fillStyle='#fc9';ctx.fillRect(-p.w/2+4,-p.h/2+6,p.w-8,10); // face
-  ctx.fillStyle='#e22';ctx.fillRect(-p.w/2,-p.h/2,p.w,6); // hat brim
-  ctx.restore();
+  if(!(p.inv>0 && Math.floor(p.inv/4)%2===0)){
+    const hw=p.w/2,hh=p.h/2;
+    ctx.save();ctx.translate(p.x+p.w/2,p.y+p.h/2);ctx.scale(p.face,1);
+    ctx.fillStyle='#e22';ctx.fillRect(-hw,-hh,p.w,p.h*0.45);
+    ctx.fillStyle='#39f';ctx.fillRect(-hw,-hh+p.h*0.45,p.w,p.h*0.55);
+    ctx.fillStyle='#fc9';ctx.fillRect(-hw+4,-hh+6,p.w-8,p.h*0.26);
+    ctx.fillStyle='#e22';ctx.fillRect(-hw,-hh,p.w,6);
+    ctx.restore();
+  }
   ctx.restore();
   if(state==='win'){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#5fffbc';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.fillText(t('스테이지 클리어!','Stage Clear!'),W/2,H/2);}
 }
