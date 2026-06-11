@@ -33,11 +33,11 @@
   <div id="count" style="display:none"></div>
   <div class="overlay" id="startScreen">
     <h2 data-ko="카트 레이싱" data-en="Kart Racing">카트 레이싱</h2>
-    <p class="hint" data-ko="3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다." data-en="Be the first to finish 3 laps! You slow down when you leave the track.">3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다.</p>
+    <p class="hint" data-ko="3바퀴를 가장 먼저 완주! 트랙을 벗어나면 느려집니다. ❓아이템 박스를 먹어 🚀부스터/🍌바나나를 쓰세요." data-en="Be the first to finish 3 laps! You slow down off-track. Grab ❓item boxes for 🚀boost / 🍌banana.">3바퀴를 가장 먼저 완주! 트랙을 벗어나면 느려집니다. ❓아이템 박스를 먹어 🚀부스터/🍌바나나를 쓰세요.</p>
     <button class="btn" id="startBtn" data-ko="레이스 시작 🏁" data-en="Start Race 🏁">레이스 시작 🏁</button>
     <p class="hint"><span data-ko="🖥️ PC:" data-en="🖥️ PC:">🖥️ PC:</span> <kbd>↑</kbd> <span data-ko="가속 ·" data-en="accelerate ·">가속 ·</span> <kbd>↓</kbd> <span data-ko="브레이크/후진 ·" data-en="brake/reverse ·">브레이크/후진 ·</span> <kbd>←</kbd><kbd>→</kbd> <span data-ko="조향 ·" data-en="steer ·">조향 ·</span>
-    <kbd>Shift</kbd> <span data-ko="드리프트 ·" data-en="drift ·">드리프트 ·</span> <kbd>Space</kbd> <span data-ko="부스터" data-en="boost">부스터</span><br>
-    <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>D-패드</b><span data-ko="로 가속·조향 · 오른쪽" data-en=" to accelerate/steer · right">로 가속·조향 · 오른쪽</span> <b data-ko="드리프트/부스터" data-en="drift/boost">드리프트/부스터</b> <span data-ko="버튼" data-en="buttons">버튼</span></p>
+    <kbd>Shift</kbd> <span data-ko="드리프트(떼면 미니부스터) ·" data-en="drift (release for mini-boost) ·">드리프트(떼면 미니부스터) ·</span> <kbd>Space</kbd> <span data-ko="아이템 사용" data-en="use item">아이템 사용</span><br>
+    <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>D-패드</b><span data-ko="로 가속·조향 · 오른쪽" data-en=" to accelerate/steer · right">로 가속·조향 · 오른쪽</span> <b data-ko="드리프트/아이템" data-en="drift/item">드리프트/아이템</b> <span data-ko="버튼" data-en="buttons">버튼</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -80,6 +80,39 @@ let karts, state='menu', startTime=0, finishTime=0;
 const COLORS=['#ff5f6d','#5f9fff','#5fffbc','#ffd35f'];
 const NAMES=[t('플레이어','Player'),t('로디','Rody'),t('다오','Dao'),t('배찌','Bazzi')];
 
+// ---- 아이템/장애물/효과 ----
+let boxes=[], hazards=[], marks=[], smoke=[], useHeld=false;
+const KR=14;
+function makeBoxes(){ boxes=[]; [2,5,8,11,13].forEach(i=>{const p=track[i]; boxes.push({x:p.x,y:p.y,r:11,active:true,respawn:0,spin:0});}); }
+
+// ---- 사운드 (WebAudio) ----
+let actx=null, engine=null, engGain=null;
+function AC(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(f,f2,dur,type,vol,when){ const a=AC(); if(!a)return; const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t0); if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.12,t0); g.gain.exponentialRampToValueAtTime(0.0008,t0+dur); o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+dur); }
+function sfx(type){ switch(type){
+  case 'beep': tone(440,440,0.12,'square',0.13); break;
+  case 'go': tone(760,940,0.26,'square',0.16); break;
+  case 'boost': tone(300,760,0.3,'sawtooth',0.12); break;
+  case 'pickup': tone(520,820,0.12,'triangle',0.13); break;
+  case 'spin': tone(520,110,0.32,'sawtooth',0.14); break;
+  case 'finish': tone(523,523,0.12,'square',0.14); tone(659,659,0.12,'square',0.14,0.13); tone(784,784,0.24,'square',0.16,0.26); break;
+} }
+function startEngine(){ const a=AC(); if(!a||engine)return; engine=a.createOscillator(); engGain=a.createGain();
+  engine.type='sawtooth'; engine.frequency.value=70; engGain.gain.value=0; engine.connect(engGain); engGain.connect(a.destination); engine.start(); }
+function stopEngine(){ if(engine){ try{engine.stop();}catch(e){} engine=null; engGain=null; } }
+function updateEngine(){ if(!engine||!actx||!karts)return; const sp=Math.abs(karts[0].speed);
+  engine.frequency.setTargetAtTime(58+sp*34+(karts[0].boost>0?70:0),actx.currentTime,0.06);
+  engGain.gain.setTargetAtTime(state==='race'?0.045:0,actx.currentTime,0.1); }
+
+function useItem(k){
+  if(!k.item)return;
+  if(k.item==='boost'){ k.boost=Math.max(k.boost,55); if(k.isPlayer)sfx('boost'); }
+  else { const bx=k.x-Math.cos(k.angle)*22, by=k.y-Math.sin(k.angle)*22; hazards.push({x:bx,y:by,r:9,owner:k,arm:40,dead:false}); }
+  k.item=null;
+}
+
 function startLineDir(){const a=track[0],b=track[1];const ang=Math.atan2(b.y-a.y,b.x-a.x);return ang;}
 
 function initKarts(){
@@ -92,10 +125,11 @@ function initKarts(){
       x:a.x+Math.cos(perp)*off, y:a.y+Math.sin(perp)*off,
       angle:ang, speed:0, color:COLORS[i], name:NAMES[i],
       isPlayer:i===0, lap:0, seg:0, prog:0, finished:false, finishT:0,
-      driftCharge:0, boost:0, drifting:false, rank:1, lastSeg:0,
-      armed:false, stuck:0, aiTurn:0
+      driftCharge:0, boost:0, drifting:false, wasDrifting:false, rank:1, lastSeg:0,
+      armed:false, stuck:0, aiTurn:0, item:null, spin:0, itemTimer:0
     });
   }
+  makeBoxes(); hazards=[]; marks=[]; smoke=[]; useHeld=false;
 }
 
 let keys={};
@@ -104,10 +138,11 @@ addEventListener('keyup',e=>keys[e.key]=false);
 
 function startGame(){
   initKarts(); state='count'; endScreen.classList.add('hidden'); startScreen.classList.add('hidden');
+  AC(); startEngine(); sfx('beep');
   let n=3; const cd=document.getElementById('count'); cd.style.display='block'; cd.textContent=n;
   const iv=setInterval(()=>{
-    n--; if(n>0){cd.textContent=n;}
-    else if(n===0){cd.textContent='GO!';}
+    n--; if(n>0){cd.textContent=n;sfx('beep');}
+    else if(n===0){cd.textContent='GO!';sfx('go');}
     else{clearInterval(iv);cd.style.display='none';state='race';startTime=performance.now();}
   },800);
 }
@@ -115,7 +150,9 @@ document.getElementById('startBtn').onclick=startGame;
 document.getElementById('restartBtn').onclick=startGame;
 
 function updateKart(k,dt,input){
-  const maxSpeed=k.boost>0?6.2:4.3;
+  // 스핀아웃 중엔 조작 불가, 빙글 회전
+  if(k.spin>0){ k.spin--; input={up:false,down:false,left:false,right:false,drift:false}; k.angle+=0.45; k.boost=0; }
+  const maxSpeed=k.boost>0?6.4:4.3;
   const accel=0.12, friction=0.045, turnRate=0.045;
   let onR=onRoad(k.x,k.y);
   if(input.up)k.speed+=accel; if(input.down)k.speed-=accel*0.8;
@@ -127,13 +164,26 @@ function updateKart(k,dt,input){
   k.drifting=input.drift&&Math.abs(turn)>0&&k.speed>2;
   let tr=turnRate*(k.drifting?1.7:1)*speedFactor*Math.sign(k.speed||1);
   k.angle+=turn*tr;
-  if(k.drifting){k.driftCharge=Math.min(100,k.driftCharge+1.6);}
-  if(input.boost&&k.driftCharge>20){k.boost=Math.floor(k.driftCharge/2.2);k.driftCharge=0;}
+  if(k.drifting){
+    k.driftCharge=Math.min(100,k.driftCharge+1.6);
+    if(onR){ for(const s of [-1,1]) marks.push({x:k.x+Math.cos(k.angle+1.57)*6*s-Math.cos(k.angle)*8,y:k.y+Math.sin(k.angle+1.57)*6*s-Math.sin(k.angle)*8,a:0.45});
+      if(marks.length>420)marks.splice(0,30);
+      if(Math.random()<0.6)smoke.push({x:k.x-Math.cos(k.angle)*10,y:k.y-Math.sin(k.angle)*10,vx:(Math.random()-.5),vy:(Math.random()-.5),life:16}); }
+  }
+  // 드리프트를 멈추는 순간 충전량만큼 미니 부스터 자동 발동
+  if(k.wasDrifting && !k.drifting && k.driftCharge>20){ k.boost=Math.max(k.boost,Math.floor(k.driftCharge/2.2)); if(k.isPlayer)sfx('boost'); k.driftCharge=0; }
+  if(!k.drifting && !k.wasDrifting) k.driftCharge=Math.max(0,k.driftCharge-1);
+  k.wasDrifting=k.drifting;
   if(k.boost>0)k.boost--;
   // drift slip
   const moveAng=k.angle+(k.drifting?turn*0.25:0);
   k.x+=Math.cos(moveAng)*k.speed; k.y+=Math.sin(moveAng)*k.speed;
   k.x=Math.max(12,Math.min(W-12,k.x)); k.y=Math.max(12,Math.min(H-12,k.y));
+  // 아이템 박스 획득
+  if(!k.item) for(const bx of boxes){ if(bx.active && Math.hypot(k.x-bx.x,k.y-bx.y)<KR+bx.r){ bx.active=false;bx.respawn=300; k.item=Math.random()<0.55?'boost':'banana'; k.itemTimer=0; if(k.isPlayer)sfx('pickup'); } }
+  // 바나나 충돌 → 스핀아웃 (던진 본인은 잠시 면역)
+  if(k.spin<=0) for(const hz of hazards){ if(hz.dead||(hz.owner===k&&hz.arm>0))continue;
+    if(Math.hypot(k.x-hz.x,k.y-hz.y)<KR+hz.r){ k.spin=45; k.speed*=0.32; hz.dead=true; if(k.isPlayer)sfx('spin'); } }
   // progress tracking (checkpoint-armed lap counting prevents false laps at start line)
   const ns=nearestSeg(k.x,k.y);
   const newSeg=ns.seg, half=Math.floor(track.length/2);
@@ -169,11 +219,24 @@ function aiInput(k){
 function update(dt){
   for(const k of karts){
     if(k.finished)continue;
-    let inp;
-    if(k.isPlayer)inp={up:keys['ArrowUp'],down:keys['ArrowDown'],left:keys['ArrowLeft'],right:keys['ArrowRight'],drift:keys['Shift'],boost:keys[' ']};
-    else inp=aiInput(k);
+    let inp = k.isPlayer
+      ? {up:keys['ArrowUp'],down:keys['ArrowDown'],left:keys['ArrowLeft'],right:keys['ArrowRight'],drift:keys['Shift']}
+      : aiInput(k);
     updateKart(k,dt,inp);
   }
+  // 플레이어 아이템 사용 (Space, 누른 순간만)
+  const useKey=keys[' ']||keys['Spacebar'];
+  if(useKey&&!useHeld&&!karts[0].finished) useItem(karts[0]);
+  useHeld=useKey;
+  // AI 아이템 사용
+  for(let i=1;i<karts.length;i++){ const k=karts[i]; if(k.finished||!k.item)continue; k.itemTimer++;
+    if(k.item==='boost'&&k.itemTimer>40) useItem(k);
+    else if(k.item==='banana'&&k.itemTimer>80&&Math.random()<0.04) useItem(k); }
+  // 박스 리스폰 + 효과 수명
+  for(const bx of boxes){ bx.spin+=0.05; if(!bx.active){ bx.respawn--; if(bx.respawn<=0)bx.active=true; } }
+  for(const hz of hazards){ if(hz.arm>0)hz.arm--; } hazards=hazards.filter(h=>!h.dead);
+  for(const m of marks)m.a*=0.99; marks=marks.filter(m=>m.a>0.05);
+  for(const s of smoke){s.x+=s.vx;s.y+=s.vy;s.vx*=.9;s.vy*=.9;s.life--;} smoke=smoke.filter(s=>s.life>0);
   // ranking
   const sorted=[...karts].sort((a,b)=>(b.finished?1e9-b.finishT:b.prog)-(a.finished?1e9-a.finishT:a.prog));
   sorted.forEach((k,i)=>k.rank=i+1);
@@ -186,7 +249,7 @@ function update(dt){
 }
 
 function endRace(){
-  if(state==='over')return; state='over';
+  if(state==='over')return; state='over'; stopEngine(); sfx('finish');
   const sorted=[...karts].sort((a,b)=>(a.finished?a.finishT:1e9)-(b.finished?b.finishT:1e9));
   const player=karts[0];
   const rank=sorted.indexOf(player)+1;
@@ -229,6 +292,22 @@ function draw(){
     const oy=Math.sin(perp)*i*ROADW/2.5+Math.sin(ang)*j*10;
     ctx.save();ctx.translate(a.x+ox,a.y+oy);ctx.rotate(ang);ctx.fillRect(-5,-ROADW/2.5/2,10,ROADW/2.5);ctx.restore();
   }
+  // 스키드마크
+  ctx.fillStyle='#222';
+  for(const m of marks){ ctx.globalAlpha=m.a; ctx.fillRect(m.x-1.5,m.y-1.5,3,3); }
+  ctx.globalAlpha=1;
+  // 바나나
+  ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const hz of hazards) ctx.fillText('🍌',hz.x,hz.y);
+  // 아이템 박스
+  for(const bx of boxes){ if(!bx.active)continue;
+    ctx.save();ctx.translate(bx.x,bx.y);ctx.rotate(Math.sin(bx.spin)*0.3);
+    ctx.fillStyle='rgba(255,255,255,.92)';ctx.fillRect(-bx.r,-bx.r,bx.r*2,bx.r*2);
+    ctx.strokeStyle='#ff7b3a';ctx.lineWidth=2;ctx.strokeRect(-bx.r,-bx.r,bx.r*2,bx.r*2);
+    ctx.fillStyle='#ff7b3a';ctx.font='bold 15px sans-serif';ctx.fillText('?',0,1);ctx.restore(); }
+  // 드리프트 연기
+  for(const s of smoke){ ctx.globalAlpha=Math.min(0.5,s.life/16*0.5);ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(s.x,s.y,3+(16-s.life)*0.3,0,7);ctx.fill(); }
+  ctx.globalAlpha=1;
   // karts
   for(const k of [...karts].sort((a,b)=>a.isPlayer-b.isPlayer)){
     ctx.save();ctx.translate(k.x,k.y);ctx.rotate(k.angle);
@@ -248,7 +327,15 @@ function draw(){
   ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(14,H-30,160,18);
   ctx.fillStyle='#444';ctx.fillRect(18,H-26,150,10);
   ctx.fillStyle=p.driftCharge>=20?'#ffc371':'#888';ctx.fillRect(18,H-26,150*(p.driftCharge/100),10);
-  ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(t('부스터','Boost'),18,H-30);
+  ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(t('드리프트 충전','Drift charge'),18,H-30);
+  // 보유 아이템
+  ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(182,H-36,52,30);
+  if(p.item){ ctx.font='20px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(p.item==='boost'?'🚀':'🍌',208,H-21);
+    ctx.fillStyle='#ffd35f';ctx.font='8px sans-serif';ctx.textBaseline='alphabetic';ctx.fillText(t('Space 사용','Space'),208,H-2);
+  } else { ctx.fillStyle='#667';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t('아이템','Item'),208,H-21); }
+  ctx.textBaseline='alphabetic';
+  updateEngine();
 }
 
 let last=0;
@@ -266,7 +353,7 @@ initKarts(); requestAnimationFrame(loop);
 TC.make({
   landscape:true,
   dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}},
-  right:[{label:'🌀',sub:t('드리프트','Drift'),key:'Shift'},{label:'🚀',sub:t('부스터','Boost'),key:' ',cls:'big'}]
+  right:[{label:'🌀',sub:t('드리프트','Drift'),key:'Shift',cls:'big'},{label:'🎁',sub:t('아이템','Item'),key:' ',cls:'big'}]
 });
 </script>
 </body>
