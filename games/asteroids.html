@@ -31,13 +31,13 @@
 <div id="wrap">
   <canvas id="cv" width="720" height="540"></canvas>
   <div class="overlay" id="startScreen">
-    <h2>소행성 (Asteroids)</h2>
-    <p class="hint">우주선을 조종해 소행성을 모두 파괴하세요. 큰 소행성은 부서지며 작아집니다. 가끔 UFO가 등장!</p>
-    <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>←→</kbd> 회전 · <kbd>↑</kbd> 추진 · <kbd>Space</kbd> 발사 · <kbd>Shift</kbd> 하이퍼점프</p>
+    <h2 data-ko="소행성 (Asteroids)" data-en="Asteroids">소행성 (Asteroids)</h2>
+    <p class="hint" data-ko="우주선을 조종해 소행성을 모두 파괴하세요. 큰 소행성은 부서지며 작아집니다. 가끔 UFO가 등장!" data-en="Pilot your ship and destroy all the asteroids. Big asteroids break into smaller ones. UFOs appear occasionally!">우주선을 조종해 소행성을 모두 파괴하세요. 큰 소행성은 부서지며 작아집니다. 가끔 UFO가 등장!</p>
+    <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+    <p class="hint"><kbd>←→</kbd> <span data-ko="회전" data-en="Rotate">회전</span> · <kbd>↑</kbd> <span data-ko="추진" data-en="Thrust">추진</span> · <kbd>Space</kbd> <span data-ko="발사" data-en="Fire">발사</span> · <kbd>Shift</kbd> <span data-ko="하이퍼점프" data-en="Hyperjump">하이퍼점프</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
-    <h2>게임 오버</h2>
+    <h2 data-ko="게임 오버" data-en="Game Over">게임 오버</h2>
     <p class="hint" id="endStats"></p>
     <button class="btn" id="restartBtn">🔄 재시작</button>
     <a class="btn alt" href="../index.html">🏠 홈으로</a>
@@ -151,7 +151,7 @@ function hit(){
 }
 function end(){
   state='over';
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`,`Score: <b>${score}</b> · Wave ${wave}<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
@@ -190,8 +190,8 @@ requestAnimationFrame(loop);
 <script>
 TC.make({
   landscape:true,
-  left:[{label:'↺',key:'ArrowLeft'},{label:'🔥',sub:'추진',key:'ArrowUp',cls:'big'},{label:'↻',key:'ArrowRight'}],
-  right:[{label:'●',sub:'발사',key:' ',repeat:true,cls:'big'},{label:'✦',sub:'점프',key:'Shift'}]
+  left:[{label:'↺',key:'ArrowLeft'},{label:'🔥',sub:t('추진','Thrust'),key:'ArrowUp',cls:'big'},{label:'↻',key:'ArrowRight'}],
+  right:[{label:'●',sub:t('발사','Fire'),key:' ',repeat:true,cls:'big'},{label:'✦',sub:t('점프','Jump'),key:'Shift'}]
 });
 </script>
 </body>

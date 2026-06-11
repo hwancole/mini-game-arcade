@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏎️ 카트 레이싱</title>
+<title data-ko="🏎️ 카트 레이싱" data-en="🏎️ Kart Racing">🏎️ 카트 레이싱</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0d1410;color:#eee;
@@ -32,12 +32,12 @@
   <canvas id="cv" width="900" height="560"></canvas>
   <div id="count" style="display:none"></div>
   <div class="overlay" id="startScreen">
-    <h2>카트 레이싱</h2>
-    <p class="hint">3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다.</p>
-    <button class="btn" id="startBtn">레이스 시작 🏁</button>
-    <p class="hint">🖥️ PC: <kbd>↑</kbd> 가속 · <kbd>↓</kbd> 브레이크/후진 · <kbd>←</kbd><kbd>→</kbd> 조향 ·
-    <kbd>Shift</kbd> 드리프트 · <kbd>Space</kbd> 부스터<br>
-    📱 모바일: 왼쪽 <b>D-패드</b>로 가속·조향 · 오른쪽 <b>드리프트/부스터</b> 버튼</p>
+    <h2 data-ko="카트 레이싱" data-en="Kart Racing">카트 레이싱</h2>
+    <p class="hint" data-ko="3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다." data-en="Be the first to finish 3 laps! You slow down when you leave the track.">3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다.</p>
+    <button class="btn" id="startBtn" data-ko="레이스 시작 🏁" data-en="Start Race 🏁">레이스 시작 🏁</button>
+    <p class="hint"><span data-ko="🖥️ PC:" data-en="🖥️ PC:">🖥️ PC:</span> <kbd>↑</kbd> <span data-ko="가속 ·" data-en="accelerate ·">가속 ·</span> <kbd>↓</kbd> <span data-ko="브레이크/후진 ·" data-en="brake/reverse ·">브레이크/후진 ·</span> <kbd>←</kbd><kbd>→</kbd> <span data-ko="조향 ·" data-en="steer ·">조향 ·</span>
+    <kbd>Shift</kbd> <span data-ko="드리프트 ·" data-en="drift ·">드리프트 ·</span> <kbd>Space</kbd> <span data-ko="부스터" data-en="boost">부스터</span><br>
+    <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>D-패드</b><span data-ko="로 가속·조향 · 오른쪽" data-en=" to accelerate/steer · right">로 가속·조향 · 오른쪽</span> <b data-ko="드리프트/부스터" data-en="drift/boost">드리프트/부스터</b> <span data-ko="버튼" data-en="buttons">버튼</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -78,7 +78,7 @@ function onRoad(px,py){return nearestSeg(px,py).dist<ROADW;}
 
 let karts, state='menu', startTime=0, finishTime=0;
 const COLORS=['#ff5f6d','#5f9fff','#5fffbc','#ffd35f'];
-const NAMES=['플레이어','로디','다오','배찌'];
+const NAMES=[t('플레이어','Player'),t('로디','Rody'),t('다오','Dao'),t('배찌','Bazzi')];
 
 function startLineDir(){const a=track[0],b=track[1];const ang=Math.atan2(b.y-a.y,b.x-a.x);return ang;}
 
@@ -178,7 +178,7 @@ function update(dt){
   const sorted=[...karts].sort((a,b)=>(b.finished?1e9-b.finishT:b.prog)-(a.finished?1e9-a.finishT:a.prog));
   sorted.forEach((k,i)=>k.rank=i+1);
   const player=karts[0];
-  hud.innerHTML=`🏁 ${Math.min(player.lap+1,3)}/3바퀴 · ${player.rank}위 · ⏱️ ${((performance.now()-startTime)/1000).toFixed(1)}s`;
+  hud.innerHTML=t(`🏁 ${Math.min(player.lap+1,3)}/3바퀴 · ${player.rank}위 · ⏱️ ${((performance.now()-startTime)/1000).toFixed(1)}s`,`🏁 Lap ${Math.min(player.lap+1,3)}/3 · ${player.rank}${['th','st','nd','rd'][(player.rank%10>3||(player.rank%100>=11&&player.rank%100<=13))?0:player.rank%10]} · ⏱️ ${((performance.now()-startTime)/1000).toFixed(1)}s`);
   if(karts.every(k=>k.finished)){ endRace(); }
   else if(player.finished && state==='race'){ /* let others finish but allow end */
     if(performance.now()-startTime - player.finishT>4000) endRace();
@@ -190,16 +190,16 @@ function endRace(){
   const sorted=[...karts].sort((a,b)=>(a.finished?a.finishT:1e9)-(b.finished?b.finishT:1e9));
   const player=karts[0];
   const rank=sorted.indexOf(player)+1;
-  document.getElementById('endTitle').textContent= rank===1?'🏆 1위! 우승!':`${rank}위로 완주`;
+  document.getElementById('endTitle').textContent= rank===1?t('🏆 1위! 우승!','🏆 1st place! You win!'):t(`${rank}위로 완주`,`Finished ${rank}${['th','st','nd','rd'][(rank%10>3||(rank%100>=11&&rank%100<=13))?0:rank%10]}`);
   let s='';
   if(player.finished){
-    const t=player.finishT/1000, key='racing_best', prev=parseFloat(localStorage.getItem(key)||'0');
-    const isNew=!prev||t<prev; if(isNew)localStorage.setItem(key,t.toFixed(2));
-    const bestNow=isNew?t:prev;
-    s+=`기록: <b>${t.toFixed(2)}초</b><br>🏆 최고 랩: <b>${bestNow.toFixed(2)}초</b>${isNew?' 🎉 신기록!':''}<br>`;
-    s+=`<span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span><br><br>`;
-  } else s+='미완주<br><br>';
-  sorted.forEach((k,i)=>{s+=`${i+1}위 - ${k.name} ${k.finished?'('+(k.finishT/1000).toFixed(2)+'s)':'(미완주)'}<br>`;});
+    const ft=player.finishT/1000, key='racing_best', prev=parseFloat(localStorage.getItem(key)||'0');
+    const isNew=!prev||ft<prev; if(isNew)localStorage.setItem(key,ft.toFixed(2));
+    const bestNow=isNew?ft:prev;
+    s+=t(`기록: <b>${ft.toFixed(2)}초</b><br>🏆 최고 랩: <b>${bestNow.toFixed(2)}초</b>${isNew?' 🎉 신기록!':''}<br>`,`Time: <b>${ft.toFixed(2)}s</b><br>🏆 Best lap: <b>${bestNow.toFixed(2)}s</b>${isNew?' 🎉 New record!':''}<br>`);
+    s+=t(`<span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span><br><br>`,`<span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span><br><br>`);
+  } else s+=t('미완주<br><br>','Did not finish<br><br>');
+  sorted.forEach((k,i)=>{s+=t(`${i+1}위 - ${k.name} ${k.finished?'('+(k.finishT/1000).toFixed(2)+'s)':'(미완주)'}<br>`,`${i+1}. ${k.name} ${k.finished?'('+(k.finishT/1000).toFixed(2)+'s)':'(DNF)'}<br>`);});
   document.getElementById('endStats').innerHTML=s;
   endScreen.classList.remove('hidden');
 }
@@ -248,7 +248,7 @@ function draw(){
   ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(14,H-30,160,18);
   ctx.fillStyle='#444';ctx.fillRect(18,H-26,150,10);
   ctx.fillStyle=p.driftCharge>=20?'#ffc371':'#888';ctx.fillRect(18,H-26,150*(p.driftCharge/100),10);
-  ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText('부스터',18,H-30);
+  ctx.fillStyle='#fff';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText(t('부스터','Boost'),18,H-30);
 }
 
 let last=0;
@@ -266,7 +266,7 @@ initKarts(); requestAnimationFrame(loop);
 TC.make({
   landscape:true,
   dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}},
-  right:[{label:'🌀',sub:'드리프트',key:'Shift'},{label:'🚀',sub:'부스터',key:' ',cls:'big'}]
+  right:[{label:'🌀',sub:t('드리프트','Drift'),key:'Shift'},{label:'🚀',sub:t('부스터','Boost'),key:' ',cls:'big'}]
 });
 </script>
 </body>

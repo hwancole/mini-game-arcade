@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🍄 점프 어드벤처</title>
+<title data-ko="🍄 점프 어드벤처" data-en="🍄 Jump Adventure">🍄 점프 어드벤처</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#1a1a2e;color:#eee;
@@ -30,11 +30,11 @@
 <div id="wrap">
   <canvas id="cv" width="900" height="500"></canvas>
   <div class="overlay" id="startScreen">
-    <h2>점프 어드벤처</h2>
-    <p class="hint">적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버.</p>
+    <h2 data-ko="점프 어드벤처" data-en="Jump Adventure">점프 어드벤처</h2>
+    <p class="hint" data-ko="적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버." data-en="Stomp enemies, collect coins, and reach the flag! Fall in a pit or get hit by an enemy and it's game over.">적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint">🖥️ PC: <kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd>/<kbd>↑</kbd> 점프(길게=높이) · <kbd>Shift</kbd> 달리기<br>
-    📱 모바일: 왼쪽 <b>◀▶</b> 이동 · 오른쪽 <b>점프/달리기</b> 버튼</p>
+    <p class="hint"><span data-ko="🖥️ PC:" data-en="🖥️ PC:">🖥️ PC:</span> <kbd>←</kbd><kbd>→</kbd> <span data-ko="이동 ·" data-en="move ·">이동 ·</span> <kbd>Space</kbd>/<kbd>↑</kbd> <span data-ko="점프(길게=높이) ·" data-en="jump (hold = higher) ·">점프(길게=높이) ·</span> <kbd>Shift</kbd> <span data-ko="달리기" data-en="run">달리기</span><br>
+    <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>◀▶</b> <span data-ko="이동 · 오른쪽" data-en="move · right">이동 · 오른쪽</span> <b data-ko="점프/달리기" data-en="jump/run">점프/달리기</b> <span data-ko="버튼" data-en="buttons">버튼</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -169,13 +169,13 @@ function update(){
   // flag win
   if(flag&&aabb(p,flag)){winLevel();}
   levelTime-=1/60; if(levelTime<=0)die();
-  hud.innerHTML=`💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · 스테이지 ${level+1}/${LEVELS.length}`;
+  hud.innerHTML=t(`💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · 스테이지 ${level+1}/${LEVELS.length}`,`💰 ${score} · ❤️ ${lives} · ⏱️ ${Math.ceil(levelTime)} · Stage ${level+1}/${LEVELS.length}`);
 }
 
 function die(){
   if(player.dead)return; player.dead=true; lives--;
   setTimeout(()=>{
-    if(lives<=0){state='over';showEnd('💀 게임 오버',`최종 점수: <b>${score}</b>`);}
+    if(lives<=0){state='over';showEnd(t('💀 게임 오버','💀 Game Over'),t(`최종 점수: <b>${score}</b>`,`Final score: <b>${score}</b>`));}
     else{loadLevel();}
   },800);
   state='dying';
@@ -185,14 +185,14 @@ function winLevel(){
   if(state!=='play')return;
   score+=Math.ceil(levelTime)*10+500;
   level++;
-  if(level>=LEVELS.length){state='over';showEnd('🏆 클리어!',`모든 스테이지 완료!<br>최종 점수: <b>${score}</b>`);}
+  if(level>=LEVELS.length){state='over';showEnd(t('🏆 클리어!','🏆 Cleared!'),t(`모든 스테이지 완료!<br>최종 점수: <b>${score}</b>`,`All stages complete!<br>Final score: <b>${score}</b>`));}
   else{state='win';setTimeout(loadLevel,1000);}
 }
 function showEnd(t,s){
   const key='mario_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
-  s+=`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`;
-  s+=`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
+  s+=t(`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best score: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 New record!':''}`);
+  s+=t(`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span>`);
   document.getElementById('endTitle').textContent=t;document.getElementById('endStats').innerHTML=s;endScreen.classList.remove('hidden');
 }
 
@@ -238,7 +238,7 @@ function draw(){
   ctx.fillStyle='#e22';ctx.fillRect(-p.w/2,-p.h/2,p.w,6); // hat brim
   ctx.restore();
   ctx.restore();
-  if(state==='win'){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#5fffbc';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.fillText('스테이지 클리어!',W/2,H/2);}
+  if(state==='win'){ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#5fffbc';ctx.font='bold 40px sans-serif';ctx.textAlign='center';ctx.fillText(t('스테이지 클리어!','Stage Clear!'),W/2,H/2);}
 }
 function cloud(x,y){ctx.beginPath();ctx.arc(x,y,20,0,7);ctx.arc(x+22,y+4,26,0,7);ctx.arc(x+50,y,20,0,7);ctx.arc(x+25,y-12,22,0,7);ctx.fill();}
 
@@ -256,7 +256,7 @@ requestAnimationFrame(loop);
 TC.make({
   landscape:true,
   left:[{label:'◀',key:'ArrowLeft',cls:'big'},{label:'▶',key:'ArrowRight',cls:'big'}],
-  right:[{label:'🏃',sub:'달리기',key:'Shift'},{label:'⤴',sub:'점프',key:' ',cls:'big'}]
+  right:[{label:'🏃',sub:t('달리기','Run'),key:'Shift'},{label:'⤴',sub:t('점프','Jump'),key:' ',cls:'big'}]
 });
 </script>
 </body>

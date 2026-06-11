@@ -40,16 +40,16 @@
   <button class="btn alt" id="menuBtn">⚙️ 모드 변경</button>
 </div>
 <div class="record" id="record"></div>
-<p class="hint">20×20 · 가로·세로·대각선 <b>5목</b>이면 승리 · 흑 선공 · 모바일은 교차점을 탭하세요 (기본 오목 규칙, 쌍삼 허용)</p>
+<p class="hint" id="rulesHint">20×20 · 가로·세로·대각선 <b>5목</b>이면 승리 · 흑 선공 · 모바일은 교차점을 탭하세요 (기본 오목 규칙, 쌍삼 허용)</p>
 
 <div class="overlay" id="startScreen">
-  <h2>⚫ 오목</h2>
+  <h2 data-ko="⚫ 오목" data-en="⚫ Gomoku">⚫ 오목</h2>
   <div class="opts" id="modeOpts">
     <div class="opt sel" data-mode="ai">🤖 AI 대전</div>
     <div class="opt" data-mode="2p">👥 2인 플레이</div>
   </div>
   <div id="diffWrap">
-    <div style="color:#9aa;font-size:.85rem;margin-bottom:6px">난이도</div>
+    <div style="color:#9aa;font-size:.85rem;margin-bottom:6px" data-ko="난이도" data-en="Difficulty">난이도</div>
     <div class="diffs">
       <div class="opt sel" data-diff="easy">쉬움</div>
       <div class="opt" data-diff="normal">보통</div>
@@ -72,6 +72,7 @@ const N=20, cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const MARGIN=20, CELL=(cv.width-MARGIN*2)/(N-1), R=CELL*0.42;
 let board, turn, mode='ai', diff='easy', history, state, winLine=null, thinking=false;
 const statusEl=document.getElementById('status');
+document.getElementById('rulesHint').innerHTML=t('20×20 · 가로·세로·대각선 <b>5목</b>이면 승리 · 흑 선공 · 모바일은 교차점을 탭하세요 (기본 오목 규칙, 쌍삼 허용)','20×20 · Get <b>5 in a row</b> horizontally, vertically, or diagonally to win · Black moves first · On mobile, tap an intersection (standard Gomoku rules, double-three allowed)');
 
 // ---- 화면/메뉴 ----
 document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{
@@ -97,18 +98,18 @@ function startGame(){
   updateStatus(); draw();
 }
 function updateStatus(){
-  if(thinking){statusEl.innerHTML='🤖 AI가 생각 중...';return;}
-  const who=turn===1?'⚫ 흑':'⚪ 백';
-  let label=who+' 차례';
-  if(mode==='ai')label += turn===1?' (당신)':' (AI)';
+  if(thinking){statusEl.innerHTML=t('🤖 AI가 생각 중...','🤖 AI is thinking...');return;}
+  const who=turn===1?t('⚫ 흑','⚫ Black'):t('⚪ 백','⚪ White');
+  let label=who+t(' 차례',' to move');
+  if(mode==='ai')label += turn===1?t(' (당신)',' (You)'):' (AI)';
   statusEl.textContent=label;
 }
 
 // ---- 전적 ----
 function loadRec(){try{return JSON.parse(localStorage.getItem('gomoku_record'))||{};}catch(e){return {};}}
 function showRecord(){
-  const r=loadRec(); const fmt=d=>{const x=r[d]||{w:0,l:0};return `${d==='easy'?'쉬움':d==='normal'?'보통':'어려움'} ${x.w}승 ${x.l}패`;};
-  const txt=`📊 AI전 전적 · ${fmt('easy')} · ${fmt('normal')} · ${fmt('hard')}`;
+  const r=loadRec(); const fmt=d=>{const x=r[d]||{w:0,l:0};const dn=d==='easy'?t('쉬움','Easy'):d==='normal'?t('보통','Normal'):t('어려움','Hard');return t(`${dn} ${x.w}승 ${x.l}패`,`${dn} ${x.w}W ${x.l}L`);};
+  const txt=t(`📊 AI전 전적 · ${fmt('easy')} · ${fmt('normal')} · ${fmt('hard')}`,`📊 vs AI · ${fmt('easy')} · ${fmt('normal')} · ${fmt('hard')}`);
   document.getElementById('record').textContent=txt;
   document.getElementById('recordMenu').textContent=txt;
 }
@@ -159,12 +160,12 @@ let pendingEndTitle='';
 function endGame(winner){
   state='over';
   let title;
-  if(winner===0)title='무승부!';
+  if(winner===0)title=t('무승부!','Draw!');
   else if(mode==='ai'){
-    const youWin=winner===1; title=youWin?'🏆 승리!':'😢 패배 — 어디서 5목을 내줬는지 확인해보세요';
+    const youWin=winner===1; title=youWin?t('🏆 승리!','🏆 You win!'):t('😢 패배 — 어디서 5목을 내줬는지 확인해보세요','😢 You lose — review where the five-in-a-row was made');
     const r=loadRec(); r[diff]=r[diff]||{w:0,l:0}; if(youWin)r[diff].w++;else r[diff].l++;
     localStorage.setItem('gomoku_record',JSON.stringify(r));
-  } else title=(winner===1?'⚫ 흑':'⚪ 백')+' 승리!';
+  } else title=(winner===1?t('⚫ 흑','⚫ Black'):t('⚪ 백','⚪ White'))+t(' 승리!',' wins!');
   pendingEndTitle=title;
   showRecord();
   // 1.8초간 바둑판(승리 줄 강조)을 먼저 보여준 뒤 결과 표시
@@ -179,7 +180,7 @@ function clearFloat(){const f=document.getElementById('floatReview');if(f)f.remo
 document.getElementById('reviewBtn').onclick=()=>{
   document.getElementById('endScreen').classList.add('hidden');
   if(document.getElementById('floatReview'))return;
-  const b=document.createElement('button');b.id='floatReview';b.textContent='📋 결과 다시 보기';
+  const b=document.createElement('button');b.id='floatReview';b.textContent=t('📋 결과 다시 보기','📋 Show Result');
   b.style.cssText='position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:30;background:#d9a86a;color:#2a1d0e;border:none;padding:12px 24px;border-radius:24px;font-weight:bold;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5)';
   b.onclick=()=>{document.getElementById('endScreen').classList.remove('hidden');b.remove();};
   document.body.appendChild(b);

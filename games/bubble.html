@@ -31,9 +31,9 @@
   <canvas id="cv" width="480" height="600"></canvas>
   <div class="overlay" id="startScreen">
     <h2>버블 슈터</h2>
-    <p class="hint">같은 색 버블 3개 이상을 모아 터뜨리세요! 천장의 모든 버블을 제거하면 클리어. 버블이 바닥선에 닿으면 게임 오버.</p>
+    <p class="hint" data-ko="같은 색 버블 3개 이상을 모아 터뜨리세요! 천장의 모든 버블을 제거하면 클리어. 버블이 바닥선에 닿으면 게임 오버." data-en="Match 3 or more bubbles of the same color to pop them! Clear all the bubbles to win. If bubbles reach the bottom line, it's game over.">같은 색 버블 3개 이상을 모아 터뜨리세요! 천장의 모든 버블을 제거하면 클리어. 버블이 바닥선에 닿으면 게임 오버.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint">마우스로 조준 · 클릭으로 발사</p>
+    <p class="hint" data-ko="마우스로 조준 · 클릭으로 발사" data-en="Aim with the mouse · Click to shoot">마우스로 조준 · 클릭으로 발사</p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -151,8 +151,8 @@ function checkState(){
 function end(win){
   state='over';
   if(score>best){best=score;localStorage.setItem('bubble_best',best);bestEl.textContent=best;}
-  document.getElementById('endTitle').textContent=win?'🏆 클리어!':'💀 게임 오버';
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 발사 ${shots}회<br>최고: ${best}`;
+  document.getElementById('endTitle').textContent=win?t('🏆 클리어!','🏆 Clear!'):t('💀 게임 오버','💀 Game Over');
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 발사 ${shots}회<br>최고: ${best}`,`Score: <b>${score}</b> · ${shots} shots<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 

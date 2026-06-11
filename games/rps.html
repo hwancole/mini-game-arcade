@@ -48,35 +48,35 @@
 </head>
 <body>
 <div class="topbar"><a href="../index.html">← 메인으로</a><b>✊ 가위바위보</b><span></span></div>
-<h1>가위바위보 vs AI</h1>
+<h1 data-ko="가위바위보 vs AI" data-en="Rock Paper Scissors vs AI">가위바위보 vs AI</h1>
 <div class="modes">
-  <div class="mode sel" data-m="random">🎲 랜덤 모드<small>AI가 무작위로 냄</small></div>
-  <div class="mode" data-m="learn">🧠 학습 모드<small>내 패턴을 학습해 예측</small></div>
+  <div class="mode sel" data-m="random"><span data-ko="🎲 랜덤 모드" data-en="🎲 Random">🎲 랜덤 모드</span><small data-ko="AI가 무작위로 냄" data-en="AI plays at random">AI가 무작위로 냄</small></div>
+  <div class="mode" data-m="learn"><span data-ko="🧠 학습 모드" data-en="🧠 Learning">🧠 학습 모드</span><small data-ko="내 패턴을 학습해 예측" data-en="Learns &amp; predicts your patterns">내 패턴을 학습해 예측</small></div>
 </div>
 
 <div class="arena">
-  <div class="side"><div class="who">나</div><div class="hand" id="myHand">❔</div></div>
+  <div class="side"><div class="who" data-ko="나" data-en="You">나</div><div class="hand" id="myHand">❔</div></div>
   <div class="vs">VS</div>
-  <div class="side"><div class="who">AI 🤖</div><div class="hand" id="aiHand">❔</div></div>
+  <div class="side"><div class="who" data-ko="AI 🤖" data-en="AI 🤖">AI 🤖</div><div class="hand" id="aiHand">❔</div></div>
 </div>
 <div id="result"></div>
 
 <div class="buttons">
-  <button class="rbtn" data-move="2">✌️<span>가위</span></button>
-  <button class="rbtn" data-move="0">✊<span>바위</span></button>
-  <button class="rbtn" data-move="1">🖐️<span>보</span></button>
+  <button class="rbtn" data-move="2">✌️<span data-ko="가위" data-en="Scissors">가위</span></button>
+  <button class="rbtn" data-move="0">✊<span data-ko="바위" data-en="Rock">바위</span></button>
+  <button class="rbtn" data-move="1">🖐️<span data-ko="보" data-en="Paper">보</span></button>
 </div>
 
 <div class="scoreboard">
-  <div class="sc win"><div class="v" id="sW">0</div><div class="l">승</div></div>
-  <div class="sc draw"><div class="v" id="sD">0</div><div class="l">무</div></div>
-  <div class="sc lose"><div class="v" id="sL">0</div><div class="l">패</div></div>
-  <div class="sc streak"><div class="v" id="sStreak">0</div><div class="l">🔥 연승</div></div>
+  <div class="sc win"><div class="v" id="sW">0</div><div class="l" data-ko="승" data-en="Win">승</div></div>
+  <div class="sc draw"><div class="v" id="sD">0</div><div class="l" data-ko="무" data-en="Draw">무</div></div>
+  <div class="sc lose"><div class="v" id="sL">0</div><div class="l" data-ko="패" data-en="Loss">패</div></div>
+  <div class="sc streak"><div class="v" id="sStreak">0</div><div class="l" data-ko="🔥 연승" data-en="🔥 Streak">🔥 연승</div></div>
 </div>
 
 <div class="lifetime" id="lifetime"></div>
-<button class="reset" id="resetBtn">통산 전적·학습 초기화</button>
-<p class="hint">학습 모드 AI는 당신이 <b>직전에 낸 손 뒤에 무엇을 내는지</b>의 패턴(최근 2수까지)을 기록해 다음 수를 예측하고 카운터를 냅니다. 게임이 쌓일수록 강해집니다. (기록·학습은 이 기기에만 저장됩니다)</p>
+<button class="reset" id="resetBtn" data-ko="통산 전적·학습 초기화" data-en="Reset record &amp; learning">통산 전적·학습 초기화</button>
+<p class="hint" id="learnHint">학습 모드 AI는 당신이 <b>직전에 낸 손 뒤에 무엇을 내는지</b>의 패턴(최근 2수까지)을 기록해 다음 수를 예측하고 카운터를 냅니다. 게임이 쌓일수록 강해집니다. (기록·학습은 이 기기에만 저장됩니다)</p>
 
 <script>
 const NAMES=['바위','보','가위'], EMOJI=['✊','🖐️','✌️']; // 0=rock,1=paper,2=scissors
@@ -154,9 +154,9 @@ function play(myMove){
 function judge(my,ai){
   const out=(my-ai+3)%3; // 0=무, 1=내가 이김, 2=AI가 이김
   let txt,cls;
-  if(out===0){txt='🤝 무승부';cls='draw';session.d++;record.d++;}
-  else if(out===1){txt='🎉 승리!';cls='win';session.w++;record.w++;session.streak++;}
-  else{txt='😢 패배';cls='lose';session.l++;record.l++;session.streak=0;}
+  if(out===0){txt=t('🤝 무승부','🤝 Draw');cls='draw';session.d++;record.d++;}
+  else if(out===1){txt=t('🎉 승리!','🎉 Win!');cls='win';session.w++;record.w++;session.streak++;}
+  else{txt=t('😢 패배','😢 Lose');cls='lose';session.l++;record.l++;session.streak=0;}
   record.games++;
   resultEl.textContent=txt;resultEl.className=cls+' show';
   setTimeout(()=>resultEl.classList.remove('show'),400);
@@ -170,16 +170,20 @@ function updateUI(){
   document.getElementById('sStreak').textContent=session.streak;
   const total=record.w+record.d+record.l;
   const rate=total?Math.round(record.w/total*100):0;
-  document.getElementById('lifetime').innerHTML=
-    `📊 통산 전적: <b style="color:#5fffac">${record.w}</b>승 <b style="color:#ffd35f">${record.d}</b>무 <b style="color:#ff5f6d">${record.l}</b>패 · 승률 <b>${rate}%</b> (${total}판)`;
+  document.getElementById('lifetime').innerHTML=t(
+    `📊 통산 전적: <b style="color:#5fffac">${record.w}</b>승 <b style="color:#ffd35f">${record.d}</b>무 <b style="color:#ff5f6d">${record.l}</b>패 · 승률 <b>${rate}%</b> (${total}판)`,
+    `📊 Lifetime: <b style="color:#5fffac">${record.w}</b>W <b style="color:#ffd35f">${record.d}</b>D <b style="color:#ff5f6d">${record.l}</b>L · Win rate <b>${rate}%</b> (${total} games)`);
 }
+document.getElementById('learnHint').innerHTML=t(
+  '학습 모드 AI는 당신이 <b>직전에 낸 손 뒤에 무엇을 내는지</b>의 패턴(최근 2수까지)을 기록해 다음 수를 예측하고 카운터를 냅니다. 게임이 쌓일수록 강해집니다. (기록·학습은 이 기기에만 저장됩니다)',
+  'In Learning mode the AI records <b>what you tend to play after your last move</b> (patterns up to the last 2 moves), predicts your next move and counters it. It grows stronger the more you play. (Records &amp; learning are stored only on this device.)');
 
 document.getElementById('resetBtn').onclick=()=>{
-  if(!confirm('통산 전적과 학습 데이터를 모두 초기화할까요?'))return;
+  if(!confirm(t('통산 전적과 학습 데이터를 모두 초기화할까요?','Reset all lifetime records and learning data?')))return;
   model={o1:{},o2:{}};record={w:0,d:0,l:0,games:0};history=[];
   save('rps_model',model);save('rps_record',record);
   session={w:0,d:0,l:0,streak:0};updateUI();
-  resultEl.textContent='초기화됨';resultEl.className='draw';myHand.textContent='❔';aiHand.textContent='❔';
+  resultEl.textContent=t('초기화됨','Reset');resultEl.className='draw';myHand.textContent='❔';aiHand.textContent='❔';
 };
 updateUI();
 </script>

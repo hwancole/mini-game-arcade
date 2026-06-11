@@ -56,21 +56,21 @@
 </head>
 <body>
 <div class="topbar"><a href="../index.html">← 메인으로</a><b>🐹 두더지 잡기</b><span></span></div>
-<h1>🔨 두더지를 잡아라!</h1>
+<h1 data-ko="🔨 두더지를 잡아라!" data-en="🔨 Whack the Moles!">🔨 두더지를 잡아라!</h1>
 <div class="stats">
-  <div class="box">⭐ 점수 <span id="score">0</span></div>
-  <div class="box">⏱️ <span id="time">30</span>초</div>
-  <div class="box">🔥 콤보 <span id="combo">0</span></div>
-  <div class="box">🎯 최고 <span id="best">0</span></div>
+  <div class="box"><span data-ko="⭐ 점수" data-en="⭐ Score">⭐ 점수</span> <span id="score">0</span></div>
+  <div class="box">⏱️ <span id="time">30</span><span data-ko="초" data-en="s">초</span></div>
+  <div class="box"><span data-ko="🔥 콤보" data-en="🔥 Combo">🔥 콤보</span> <span id="combo">0</span></div>
+  <div class="box"><span data-ko="🎯 최고" data-en="🎯 Best">🎯 최고</span> <span id="best">0</span></div>
 </div>
 <div class="board" id="board"></div>
 <div class="legend">
-  <span>🐹 일반 +10</span><span>👑 황금 +30</span><span>💣 폭탄 −20 & 콤보 리셋</span>
+  <span data-ko="🐹 일반 +10" data-en="🐹 Normal +10">🐹 일반 +10</span><span data-ko="👑 황금 +30" data-en="👑 Gold +30">👑 황금 +30</span><span data-ko="💣 폭탄 −20 & 콤보 리셋" data-en="💣 Bomb −20 & combo reset">💣 폭탄 −20 & 콤보 리셋</span>
 </div>
 
 <div class="overlay" id="startScreen">
-  <h2>🐹 두더지 잡기</h2>
-  <p>제한시간 안에 최대한 많은 두더지를 잡으세요!<br>황금 두더지는 보너스, 폭탄은 피하세요. 연속으로 잡으면 콤보 보너스!</p>
+  <h2 data-ko="🐹 두더지 잡기" data-en="🐹 Whack-a-Mole">🐹 두더지 잡기</h2>
+  <p><span data-ko="제한시간 안에 최대한 많은 두더지를 잡으세요!" data-en="Whack as many moles as you can before time runs out!">제한시간 안에 최대한 많은 두더지를 잡으세요!</span><br><span data-ko="황금 두더지는 보너스, 폭탄은 피하세요. 연속으로 잡으면 콤보 보너스!" data-en="Gold moles give bonuses, avoid bombs. Chain hits for a combo bonus!">황금 두더지는 보너스, 폭탄은 피하세요. 연속으로 잡으면 콤보 보너스!</span></p>
   <div class="diffs">
     <div class="d sel" data-d="easy">쉬움</div>
     <div class="d" data-d="normal">보통</div>
@@ -79,7 +79,7 @@
   <button class="btn" id="startBtn">시작 ▶</button>
 </div>
 <div class="overlay hidden" id="endScreen">
-  <h2 id="endTitle">⏰ 시간 종료!</h2>
+  <h2 id="endTitle" data-ko="⏰ 시간 종료!" data-en="⏰ Time's up!">⏰ 시간 종료!</h2>
   <p id="endStats" style="font-size:1.3rem"></p>
   <div style="display:flex;gap:12px">
     <button class="btn" id="restartBtn">🔄 다시하기</button>
@@ -180,9 +180,9 @@ function endGame(){
   running=false;clearInterval(timerIv);clearTimeout(spawnTO);
   holes.forEach(h=>setDown(h));
   const best=parseInt(localStorage.getItem('mole_best_'+diff)||'0');
-  let msg=`최종 점수: <b>${score}</b>`;
-  if(score>best){localStorage.setItem('mole_best_'+diff,score);msg+='<br>🎉 새로운 최고 기록!';}
-  else msg+=`<br>최고 기록: ${best}`;
+  let msg=t(`최종 점수: <b>${score}</b>`,`Final score: <b>${score}</b>`);
+  if(score>best){localStorage.setItem('mole_best_'+diff,score);msg+=t('<br>🎉 새로운 최고 기록!','<br>🎉 New best score!');}
+  else msg+=t(`<br>최고 기록: ${best}`,`<br>Best: ${best}`);
   document.getElementById('endStats').innerHTML=msg;
   document.getElementById('endScreen').classList.remove('hidden');
 }

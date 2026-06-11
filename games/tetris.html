@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🧩 테트리스</title>
+<title data-ko="🧩 테트리스" data-en="🧩 Tetris">🧩 테트리스</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0c0c18;color:#eee;
@@ -43,20 +43,20 @@
 <div class="topbar"><a href="../index.html">← 메인으로</a><b>🧩 테트리스</b><span></span></div>
 <div class="game">
   <div class="side">
-    <div class="panel"><h3>점수</h3><div class="v" id="score">0</div></div>
-    <div class="panel"><h3>라인</h3><div class="v" id="lines">0</div></div>
-    <div class="panel"><h3>레벨</h3><div class="v" id="level">1</div></div>
-    <div class="panel"><h3>홀드</h3><canvas id="hold" width="100" height="70"></canvas></div>
+    <div class="panel"><h3 data-ko="점수" data-en="Score">점수</h3><div class="v" id="score">0</div></div>
+    <div class="panel"><h3 data-ko="라인" data-en="Lines">라인</h3><div class="v" id="lines">0</div></div>
+    <div class="panel"><h3 data-ko="레벨" data-en="Level">레벨</h3><div class="v" id="level">1</div></div>
+    <div class="panel"><h3 data-ko="홀드" data-en="Hold">홀드</h3><canvas id="hold" width="100" height="70"></canvas></div>
   </div>
   <div id="wrap">
     <canvas id="cv" width="300" height="600"></canvas>
     <div class="overlay" id="startScreen">
-      <h2>테트리스</h2>
+      <h2 data-ko="테트리스" data-en="Tetris">테트리스</h2>
       <button class="btn" id="startBtn">시작 ▶</button>
       <p class="hint">
-        🖥️ <kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>↓</kbd> 소프트드롭 · <kbd>↑</kbd>/<kbd>X</kbd> 회전<br>
-        <kbd>Space</kbd> 하드드롭 · <kbd>C</kbd> 홀드 · <kbd>P</kbd> 일시정지<br>
-        📱 모바일: 아래 <b>◀ ▼ ▶</b> 이동 · <b>회전/홀드/드롭</b> 버튼
+        🖥️ <kbd>←</kbd><kbd>→</kbd> <span data-ko="이동 ·" data-en="move ·">이동 ·</span> <kbd>↓</kbd> <span data-ko="소프트드롭 ·" data-en="soft drop ·">소프트드롭 ·</span> <kbd>↑</kbd>/<kbd>X</kbd> <span data-ko="회전" data-en="rotate">회전</span><br>
+        <kbd>Space</kbd> <span data-ko="하드드롭 ·" data-en="hard drop ·">하드드롭 ·</span> <kbd>C</kbd> <span data-ko="홀드 ·" data-en="hold ·">홀드 ·</span> <kbd>P</kbd> <span data-ko="일시정지" data-en="pause">일시정지</span><br>
+        <span data-ko="📱 모바일: 아래" data-en="📱 Mobile: bottom">📱 모바일: 아래</span> <b>◀ ▼ ▶</b> <span data-ko="이동 ·" data-en="move ·">이동 ·</span> <b data-ko="회전/홀드/드롭" data-en="rotate/hold/drop">회전/홀드/드롭</b> <span data-ko="버튼" data-en="buttons">버튼</span>
       </p>
     </div>
     <div class="overlay hidden" id="pauseScreen"><h2>일시정지</h2><button class="btn" id="resumeBtn">계속</button></div>
@@ -68,7 +68,7 @@
     </div>
   </div>
   <div class="side">
-    <div class="panel"><h3>다음</h3><canvas id="next" width="100" height="260"></canvas></div>
+    <div class="panel"><h3 data-ko="다음" data-en="Next">다음</h3><canvas id="next" width="100" height="260"></canvas></div>
   </div>
 </div>
 
@@ -202,9 +202,9 @@ function gameOver(){
   state='over';
   const key='tetris_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 라인: ${lines} · 레벨 ${level}`+
-    `<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`+
-    `<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 라인: ${lines} · 레벨 ${level}`,`Score: <b>${score}</b> · Lines: ${lines} · Level ${level}`)+
+    t(`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best score: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 New record!':''}`)+
+    t(`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span>`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
@@ -279,7 +279,7 @@ requestAnimationFrame(loop);
 <script>
 TC.make({
   left:[{label:'◀',key:'ArrowLeft',repeat:true},{label:'▼',key:'ArrowDown',repeat:true},{label:'▶',key:'ArrowRight',repeat:true}],
-  right:[{label:'⟳',sub:'회전',key:'ArrowUp'},{label:'H',sub:'홀드',key:'c'},{label:'⤓',sub:'드롭',key:' ',cls:'big'}]
+  right:[{label:'⟳',sub:t('회전','Rotate'),key:'ArrowUp'},{label:'H',sub:t('홀드','Hold'),key:'c'},{label:'⤓',sub:t('드롭','Drop'),key:' ',cls:'big'}]
 });
 </script>
 </body>

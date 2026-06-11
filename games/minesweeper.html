@@ -37,9 +37,9 @@
 <body>
 <div class="topbar"><a href="../index.html">← 메인으로</a><b>💣 지뢰찾기</b><span></span></div>
 <div class="controls">
-  <button class="diff sel" data-d="easy">초급 9×9 · 10</button>
-  <button class="diff" data-d="medium">중급 16×16 · 40</button>
-  <button class="diff" data-d="hard">고급 16×30 · 99</button>
+  <button class="diff sel" data-d="easy" data-ko="초급 9×9 · 10" data-en="Beginner 9×9 · 10">초급 9×9 · 10</button>
+  <button class="diff" data-d="medium" data-ko="중급 16×16 · 40" data-en="Intermediate 16×16 · 40">중급 16×16 · 40</button>
+  <button class="diff" data-d="hard" data-ko="고급 16×30 · 99" data-en="Expert 16×30 · 99">고급 16×30 · 99</button>
 </div>
 <div class="stats">
   <span>💣 <span id="mineCount">10</span></span>
@@ -49,7 +49,7 @@
 <div id="board"></div>
 <div class="msg" id="msg"></div>
 <div class="best" id="best"></div>
-<p class="hint">좌클릭: 열기 · 우클릭: 깃발 · 숫자 칸을 양클릭(또는 이미 연 칸 클릭)하면 주변 자동 열기<br>첫 클릭은 항상 안전합니다.</p>
+<p class="hint"><span data-ko="좌클릭: 열기 · 우클릭: 깃발 · 숫자 칸을 양클릭(또는 이미 연 칸 클릭)하면 주변 자동 열기" data-en="Left-click: open · Right-click: flag · Both-click a number (or click an opened cell) to auto-open neighbors">좌클릭: 열기 · 우클릭: 깃발 · 숫자 칸을 양클릭(또는 이미 연 칸 클릭)하면 주변 자동 열기</span><br><span data-ko="첫 클릭은 항상 안전합니다." data-en="The first click is always safe.">첫 클릭은 항상 안전합니다.</span></p>
 
 <script>
 const DIFFS={easy:{r:9,c:9,m:10},medium:{r:16,c:16,m:40},hard:{r:16,c:30,m:99}};
@@ -125,7 +125,7 @@ let lastR=-1,lastC=-1;
 function lose(mr,mc){
   lastR=mr;lastC=mc; // highlight the mine that was clicked
   state='lost';clearInterval(timerIv);faceEl.textContent='😵';
-  msgEl.style.color='#ff5f6d';msgEl.textContent='💥 펑! 게임 오버';
+  msgEl.style.color='#ff5f6d';msgEl.textContent=t('💥 펑! 게임 오버','💥 Boom! Game Over');
   render();
 }
 function checkWin(){
@@ -133,7 +133,7 @@ function checkWin(){
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(!opened[r][c]&&grid[r][c]!==-1)unopened++;
   if(unopened===0){
     state='won';clearInterval(timerIv);faceEl.textContent='😎';
-    msgEl.style.color='#5fffbc';msgEl.textContent='🎉 클리어! '+timer+'초';
+    msgEl.style.color='#5fffbc';msgEl.textContent=t('🎉 클리어! '+timer+'초','🎉 Clear! '+timer+'s');
     flagsLeft=0;mineCountEl.textContent=0;
     saveBest();
   }
@@ -141,7 +141,7 @@ function checkWin(){
 
 function bestKey(){return 'mines_best_'+diff;}
 function saveBest(){const k=bestKey(),prev=parseInt(localStorage.getItem(k)||'0');if(!prev||timer<prev){localStorage.setItem(k,timer);}showBest();}
-function showBest(){const v=localStorage.getItem(bestKey());bestEl.textContent=v?`🏆 ${diff} 최고 기록: ${v}초`:'';}
+function showBest(){const v=localStorage.getItem(bestKey());bestEl.textContent=v?t(`🏆 ${diff} 최고 기록: ${v}초`,`🏆 ${diff} best: ${v}s`):'';}
 
 function render(){
   boardEl.style.gridTemplateColumns=`repeat(${cols},30px)`;
@@ -173,6 +173,7 @@ function render(){
 }
 function postAction(){checkWin();render();}
 
+faceEl.title=t('새 게임','New Game');
 newGame();
 
 // 모바일용 깃발 모드 토글 버튼
@@ -180,9 +181,9 @@ newGame();
   const touch=window.matchMedia('(hover:none) and (pointer:coarse)').matches || 'ontouchstart' in window;
   if(!touch)return; // 데스크톱은 우클릭으로 깃발
   const btn=document.createElement('button');
-  btn.textContent='🚩 깃발 모드: OFF';
+  btn.textContent=t('🚩 깃발 모드: OFF','🚩 Flag mode: OFF');
   btn.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:9000;padding:12px 24px;border-radius:30px;border:2px solid #c46fff;background:#2a2435;color:#fff;font-weight:bold;font-size:1rem;box-shadow:0 4px 14px rgba(0,0,0,.5)';
-  btn.onclick=()=>{flagMode=!flagMode;btn.textContent='🚩 깃발 모드: '+(flagMode?'ON':'OFF');btn.style.background=flagMode?'#c46fff':'#2a2435';btn.style.color=flagMode?'#1a1525':'#fff';};
+  btn.onclick=()=>{flagMode=!flagMode;btn.textContent=t('🚩 깃발 모드: ','🚩 Flag mode: ')+(flagMode?'ON':'OFF');btn.style.background=flagMode?'#c46fff':'#2a2435';btn.style.color=flagMode?'#1a1525':'#fff';};
   document.body.appendChild(btn);
   document.body.style.paddingBottom='80px';
 })();

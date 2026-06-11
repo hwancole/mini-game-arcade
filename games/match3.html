@@ -24,24 +24,24 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>💎 보석 맞추기</b><span></span></div>
-<h1>보석 맞추기</h1>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b data-ko="💎 보석 맞추기" data-en="💎 Match-3">💎 보석 맞추기</b><span></span></div>
+<h1 data-ko="보석 맞추기" data-en="Match-3">보석 맞추기</h1>
 <div class="stats"><span>⭐ <span id="score">0</span></span><span>🔄 <span id="moves">20</span></span><span>🏆 <span id="best">0</span></span></div>
 <div id="wrap">
   <canvas id="cv" width="480" height="480"></canvas>
   <div class="overlay" id="startScreen">
-    <h2>보석 맞추기</h2>
-    <p class="hint">인접한 두 보석을 바꿔(탭 또는 스와이프) 같은 색 3개 이상을 만드세요!<br>20번의 이동 안에 최대한 높은 점수를 노리세요.</p>
-    <button class="btn" id="startBtn">시작 ▶</button>
+    <h2 data-ko="보석 맞추기" data-en="Match-3">보석 맞추기</h2>
+    <p class="hint"><span data-ko="인접한 두 보석을 바꿔(탭 또는 스와이프) 같은 색 3개 이상을 만드세요!" data-en="Swap two adjacent gems (tap or swipe) to line up 3 or more of the same color!">인접한 두 보석을 바꿔(탭 또는 스와이프) 같은 색 3개 이상을 만드세요!</span><br><span data-ko="20번의 이동 안에 최대한 높은 점수를 노리세요." data-en="Score as high as you can within 20 moves.">20번의 이동 안에 최대한 높은 점수를 노리세요.</span></p>
+    <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
   </div>
   <div class="overlay hidden" id="endScreen">
-    <h2>게임 종료</h2>
+    <h2 data-ko="게임 종료" data-en="Game Over">게임 종료</h2>
     <p class="hint" id="endStats"></p>
-    <button class="btn" id="restartBtn">🔄 다시하기</button>
-    <a class="btn alt" href="../index.html">🏠 홈으로</a>
+    <button class="btn" id="restartBtn" data-ko="🔄 다시하기" data-en="🔄 Retry">🔄 다시하기</button>
+    <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
   </div>
 </div>
-<p class="hint">3매치 +30점 · 4매치 이상·연쇄 콤보는 추가 보너스!</p>
+<p class="hint" data-ko="3매치 +30점 · 4매치 이상·연쇄 콤보는 추가 보너스!" data-en="3-match +30 pts · 4+ matches and chain combos give bonus points!">3매치 +30점 · 4매치 이상·연쇄 콤보는 추가 보너스!</p>
 
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),SIZE=8,CELL=cv.width/SIZE;
@@ -151,7 +151,7 @@ function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,
 function end(){
   state='over';
   if(score>best){best=score;localStorage.setItem('match3_best',best);bestEl.textContent=best;}
-  document.getElementById('endStats').innerHTML=`최종 점수: <b>${score}</b><br>최고: ${best}`;
+  document.getElementById('endStats').innerHTML=t(`최종 점수: <b>${score}</b><br>최고: ${best}`,`Final Score: <b>${score}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 makeGrid();state='menu';draw();

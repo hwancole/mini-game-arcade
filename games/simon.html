@@ -44,24 +44,24 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>🧠 사이먼</b><span></span></div>
-<h1>사이먼 (기억력)</h1>
-<div class="stats"><span>🎯 레벨 <span id="level">0</span></span><span>🏆 최고 <span id="best">0</span></span></div>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🧠 사이먼</b><span></span></div>
+<h1 data-ko="사이먼 (기억력)" data-en="Simon (Memory)">사이먼 (기억력)</h1>
+<div class="stats"><span>🎯 <span data-ko="레벨" data-en="Level">레벨</span> <span id="level">0</span></span><span>🏆 <span data-ko="최고" data-en="Best">최고</span> <span id="best">0</span></span></div>
 <div class="modes">
-  <div class="mode sel" data-s="normal">보통</div>
-  <div class="mode" data-s="fast">빠름</div>
-  <div class="mode" data-s="strict">스트릭트</div>
+  <div class="mode sel" data-s="normal" data-ko="보통" data-en="Normal">보통</div>
+  <div class="mode" data-s="fast" data-ko="빠름" data-en="Fast">빠름</div>
+  <div class="mode" data-s="strict" data-ko="스트릭트" data-en="Strict">스트릭트</div>
 </div>
 <div id="simon">
   <div class="pad green" data-i="0"></div>
   <div class="pad red" data-i="1"></div>
   <div class="pad yellow" data-i="2"></div>
   <div class="pad blue" data-i="3"></div>
-  <div id="center"><div id="centerNum">–</div><div id="centerLbl">레벨</div></div>
+  <div id="center"><div id="centerNum">–</div><div id="centerLbl" data-ko="레벨" data-en="Level">레벨</div></div>
 </div>
 <div id="msg"></div>
-<button class="btn" id="startBtn">시작 ▶</button>
-<p class="hint">불빛이 켜지는 순서를 기억하고 똑같이 따라 누르세요. 한 단계씩 길어집니다!</p>
+<button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+<p class="hint" data-ko="불빛이 켜지는 순서를 기억하고 똑같이 따라 누르세요. 한 단계씩 길어집니다!" data-en="Memorize the order the lights flash and repeat it exactly. It grows by one step each round!">불빛이 켜지는 순서를 기억하고 똑같이 따라 누르세요. 한 단계씩 길어집니다!</p>
 
 <script>
 const pads=[...document.querySelectorAll('.pad')];
@@ -102,10 +102,10 @@ function nextRound(){
   playSeq();
 }
 function playSeq(){
-  state='showing';msgEl.style.color='#9aa';msgEl.textContent='잘 보세요...';
+  state='showing';msgEl.style.color='#9aa';msgEl.textContent=t('잘 보세요...','Watch carefully...');
   let i=0;
   const iv=setInterval(()=>{
-    if(i>=seq.length){clearInterval(iv);state='input';msgEl.textContent='따라 누르세요!';msgEl.style.color='#5fffac';return;}
+    if(i>=seq.length){clearInterval(iv);state='input';msgEl.textContent=t('따라 누르세요!','Your turn!');msgEl.style.color='#5fffac';return;}
     light(seq[i],Math.max(220,speed-60));i++;
   },speed);
 }
@@ -117,7 +117,7 @@ pads.forEach(p=>{
     const idx=input.length-1;
     if(input[idx]!==seq[idx]){return fail();}
     if(input.length===seq.length){
-      state='play';msgEl.textContent='✅ 정확해요!';msgEl.style.color='#5fffac';
+      state='play';msgEl.textContent=t('✅ 정확해요!','✅ Correct!');msgEl.style.color='#5fffac';
       if(level>best){best=level;localStorage.setItem('simon_best',best);bestEl.textContent=best;}
       setTimeout(nextRound,900);
     }
@@ -128,10 +128,10 @@ function fail(){
   pads.forEach(p=>p.classList.add('lit'));beep(1,150);
   setTimeout(()=>pads.forEach(p=>p.classList.remove('lit')),250);
   if(strict){
-    state='over';msgEl.style.color='#ff5f6d';msgEl.textContent=`❌ 틀렸어요! 레벨 ${level}에서 종료`;
+    state='over';msgEl.style.color='#ff5f6d';msgEl.textContent=t(`❌ 틀렸어요! 레벨 ${level}에서 종료`,`❌ Wrong! Ended at level ${level}`);
     centerNum.textContent='–';
   } else {
-    state='showing';msgEl.style.color='#ffd35f';msgEl.textContent='❌ 다시! 같은 순서를 보여줄게요';
+    state='showing';msgEl.style.color='#ffd35f';msgEl.textContent=t('❌ 다시! 같은 순서를 보여줄게요','❌ Try again! Replaying the sequence');
     input=[];setTimeout(playSeq,1200);
   }
 }

@@ -44,7 +44,8 @@
   function rotateTip(){
     if(!isTouch || document.getElementById('tc-rotate')) return;
     const tip=document.createElement('div'); tip.id='tc-rotate'; let closed=false, timer=null;
-    tip.innerHTML='📱 가로 모드로 돌리면 더 크고 편하게 즐길 수 있어요 <span style="opacity:.7">(탭하여 닫기)</span>';
+    const tr=(window.t)||((ko,en)=>ko);
+    tip.innerHTML=tr('📱 가로 모드로 돌리면 더 크고 편하게 즐길 수 있어요','📱 Rotate to landscape for a bigger, comfier view')+' <span style="opacity:.7">'+tr('(탭하여 닫기)','(tap to close)')+'</span>';
     tip.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9500;background:rgba(95,159,255,.95);color:#fff;font-size:.78rem;font-weight:700;text-align:center;padding:8px 10px;display:none;cursor:pointer';
     document.body.appendChild(tip);
     const hide=()=>{ tip.style.display='none'; if(timer){clearTimeout(timer);timer=null;} };

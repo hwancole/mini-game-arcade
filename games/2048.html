@@ -43,12 +43,12 @@
 <div class="head">
   <h1>2048</h1>
   <div class="scores">
-    <div class="sbox"><div class="l">점수</div><div class="v" id="score">0</div></div>
-    <div class="sbox"><div class="l">최고</div><div class="v" id="best">0</div></div>
+    <div class="sbox"><div class="l" data-ko="점수" data-en="Score">점수</div><div class="v" id="score">0</div></div>
+    <div class="sbox"><div class="l" data-ko="최고" data-en="Best">최고</div><div class="v" id="best">0</div></div>
   </div>
 </div>
 <div class="bar">
-  <span style="color:#bbada0;font-size:.9rem">숫자를 합쳐 2048을 만드세요!</span>
+  <span style="color:#bbada0;font-size:.9rem" data-ko="숫자를 합쳐 2048을 만드세요!" data-en="Merge the numbers to reach 2048!">숫자를 합쳐 2048을 만드세요!</span>
   <button class="btn" id="newBtn">새 게임</button>
 </div>
 <div id="board">
@@ -59,7 +59,7 @@
     <a class="btn alt" href="../index.html">🏠 홈으로</a>
   </div>
 </div>
-<p class="hint"><kbd>←↑↓→</kbd> 또는 <kbd>WASD</kbd> · 모바일은 스와이프</p>
+<p class="hint"><kbd>←↑↓→</kbd> <span data-ko="또는" data-en="or">또는</span> <kbd>WASD</kbd> · <span data-ko="모바일은 스와이프" data-en="swipe on mobile">모바일은 스와이프</span></p>
 
 <script>
 const N=4;
@@ -169,7 +169,7 @@ function move(dir){
 }
 
 function checkEnd(){
-  if(!won&&grid.some(row=>row.some(t=>t&&t.v>=2048))){won=true;showOverlay('🎉 2048 달성!');return;}
+  if(!won&&grid.some(row=>row.some(t=>t&&t.v>=2048))){won=true;showOverlay(t('🎉 2048 달성!','🎉 You reached 2048!'));return;}
   if(emptyCells().length>0)return;
   // any merges possible?
   for(let r=0;r<N;r++)for(let c=0;c<N;c++){
@@ -177,7 +177,7 @@ function checkEnd(){
     if(c+1<N&&grid[r][c+1].v===v)return;
     if(r+1<N&&grid[r+1][c].v===v)return;
   }
-  over=true;showOverlay('게임 오버');
+  over=true;showOverlay(t('게임 오버','Game Over'));
 }
 function showOverlay(t){document.getElementById('ovTitle').textContent=t;document.getElementById('overlay').classList.remove('hidden');}
 

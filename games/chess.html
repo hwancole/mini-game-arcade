@@ -54,7 +54,7 @@
 </head>
 <body>
 <div class="topbar"><a href="../index.html">← 메인으로</a><b>♟️ 체스</b><span></span></div>
-<div id="status">로딩 중...</div>
+<div id="status" data-ko="로딩 중..." data-en="Loading...">로딩 중...</div>
 <div class="captured" id="capTop"></div>
 <div id="board"></div>
 <div class="captured" id="capBot"></div>
@@ -65,31 +65,31 @@
   <button class="btn alt" id="menuBtn">⚙️ 모드</button>
 </div>
 <div id="moves"></div>
-<p class="hint">유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
+<p class="hint" data-ko="유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원" data-en="Unicode pieces · Tap a piece to see its legal moves · Choose a piece on pawn promotion · King's square turns red in check · Castling, en passant & promotion all supported">유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
 
 <div class="overlay" id="startScreen">
-  <h2>♟️ 체스</h2>
+  <h2 data-ko="♟️ 체스" data-en="♟️ Chess">♟️ 체스</h2>
   <div id="loadErr"></div>
   <div class="opts" id="modeOpts">
     <div class="opt sel" data-mode="ai">🤖 AI 대전</div>
     <div class="opt" data-mode="2p">👥 2인 플레이</div>
   </div>
   <div class="row" id="sideWrap">
-    <div class="lbl">내 진영</div>
+    <div class="lbl" data-ko="내 진영" data-en="Your side">내 진영</div>
     <div class="opts">
-      <div class="opt sel" data-side="w">⚪ 백 (선공)</div>
-      <div class="opt" data-side="b">⚫ 흑</div>
+      <div class="opt sel" data-side="w" data-ko="⚪ 백 (선공)" data-en="⚪ White (first)">⚪ 백 (선공)</div>
+      <div class="opt" data-side="b" data-ko="⚫ 흑" data-en="⚫ Black">⚫ 흑</div>
     </div>
   </div>
   <div class="row" id="diffWrap">
-    <div class="lbl">난이도</div>
+    <div class="lbl" data-ko="난이도" data-en="Difficulty">난이도</div>
     <div class="opts">
       <div class="opt" data-diff="easy">쉬움</div>
       <div class="opt sel" data-diff="normal">보통</div>
       <div class="opt" data-diff="hard">어려움</div>
     </div>
   </div>
-  <label class="chk" id="rotWrap"><input type="checkbox" id="rotChk"> 2인 플레이 시 매 턴 보드 자동 회전</label>
+  <label class="chk" id="rotWrap"><input type="checkbox" id="rotChk"> <span data-ko="2인 플레이 시 매 턴 보드 자동 회전" data-en="Auto-flip board each turn in 2-player mode">2인 플레이 시 매 턴 보드 자동 회전</span></label>
   <button class="btn" id="startBtn" style="padding:12px 30px">시작 ▶</button>
 </div>
 <div class="overlay hidden" id="endScreen">
@@ -100,7 +100,7 @@
   <a class="btn alt" href="../index.html">🏠 홈으로</a>
 </div>
 <div class="overlay hidden" id="promoScreen">
-  <h2>승급할 기물 선택</h2>
+  <h2 data-ko="승급할 기물 선택" data-en="Choose promotion piece">승급할 기물 선택</h2>
   <div id="promo"></div>
 </div>
 
@@ -130,7 +130,7 @@ const boardEl=document.getElementById('board'), statusEl=document.getElementById
 // ---- chess.js 로더 (CDN 장애 대비) ----
 (function waitLib(t){
   if(window.Chess){ Game=window.Chess; document.getElementById('loadErr').textContent=''; statusEl.textContent=''; return; }
-  if(t>60){ document.getElementById('loadErr').innerHTML='⚠️ 체스 규칙 엔진(chess.js)을 불러오지 못했습니다.<br>네트워크를 확인하거나, chess.js 파일을 games/ 폴더에 받아 두면 오프라인에서도 동작합니다.'; statusEl.textContent='엔진 로드 실패'; return; }
+  if(t>60){ document.getElementById('loadErr').innerHTML=window.t('⚠️ 체스 규칙 엔진(chess.js)을 불러오지 못했습니다.<br>네트워크를 확인하거나, chess.js 파일을 games/ 폴더에 받아 두면 오프라인에서도 동작합니다.','⚠️ Failed to load the chess rules engine (chess.js).<br>Check your network, or place the chess.js file in the games/ folder to work offline.'); statusEl.textContent=window.t('엔진 로드 실패','Engine failed to load'); return; }
   setTimeout(()=>waitLib(t+1),100);
 })(0);
 
@@ -198,11 +198,11 @@ function render(){
   renderCaptured();renderMoves();updateStatus();
 }
 function updateStatus(){
-  if(thinking){statusEl.innerHTML='🤖 AI가 생각 중...';return;}
-  const turnTxt=game.turn()==='w'?'⚪ 백':'⚫ 흑';
-  let s=turnTxt+' 차례';
-  if(mode==='ai')s+=game.turn()===mySide?' (당신)':' (AI)';
-  if(game.in_check())s+=' · 체크!';
+  if(thinking){statusEl.innerHTML=t('🤖 AI가 생각 중...','🤖 AI is thinking...');return;}
+  const turnTxt=game.turn()==='w'?t('⚪ 백','⚪ White'):t('⚫ 흑','⚫ Black');
+  let s=turnTxt+t(' 차례',' to move');
+  if(mode==='ai')s+=game.turn()===mySide?t(' (당신)',' (You)'):' (AI)';
+  if(game.in_check())s+=t(' · 체크!',' · Check!');
   statusEl.textContent=s;
 }
 function renderCaptured(){
@@ -269,14 +269,14 @@ function checkEnd(){
   if(!game.game_over())return false;
   state='over';
   let title='',sub='';
-  if(game.in_checkmate()){const loser=game.turn();const winner=loser==='w'?'흑':'백';
-    title='체크메이트!';
-    if(mode==='ai')title = (loser===mySide)?'😢 패배 (체크메이트)':'🏆 승리! (체크메이트)';
-    else title=`${winner} 승리! (체크메이트)`;
-  } else if(game.in_stalemate()){title='무승부 — 스테일메이트';}
-  else if(game.in_threefold_repetition&&game.in_threefold_repetition()){title='무승부 — 3회 반복';}
-  else if(game.insufficient_material&&game.insufficient_material()){title='무승부 — 기물 부족';}
-  else title='무승부';
+  if(game.in_checkmate()){const loser=game.turn();const winner=loser==='w'?t('흑','Black'):t('백','White');
+    title=t('체크메이트!','Checkmate!');
+    if(mode==='ai')title = (loser===mySide)?t('😢 패배 (체크메이트)','😢 You lose (checkmate)'):t('🏆 승리! (체크메이트)','🏆 You win! (checkmate)');
+    else title=t(`${winner} 승리! (체크메이트)`,`${winner} wins! (checkmate)`);
+  } else if(game.in_stalemate()){title=t('무승부 — 스테일메이트','Draw — stalemate');}
+  else if(game.in_threefold_repetition&&game.in_threefold_repetition()){title=t('무승부 — 3회 반복','Draw — threefold repetition');}
+  else if(game.insufficient_material&&game.insufficient_material()){title=t('무승부 — 기물 부족','Draw — insufficient material');}
+  else title=t('무승부','Draw');
   document.getElementById('endTitle').textContent=title;
   document.getElementById('endSub').textContent=sub;
   document.getElementById('endScreen').classList.remove('hidden');

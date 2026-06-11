@@ -26,16 +26,16 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>⚡ 반응속도</b><span></span></div>
-<h1>반응속도 테스트</h1>
-<div id="pad" class="idle">탭하여 시작<small>초록색으로 바뀌는 순간 즉시 탭하세요!</small></div>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b data-ko="⚡ 반응속도" data-en="⚡ Reaction">⚡ 반응속도</b><span></span></div>
+<h1 data-ko="반응속도 테스트" data-en="Reaction Time Test">반응속도 테스트</h1>
+<div id="pad" class="idle"><span data-ko="탭하여 시작" data-en="Tap to Start">탭하여 시작</span><small data-ko="초록색으로 바뀌는 순간 즉시 탭하세요!" data-en="Tap the instant it turns green!">초록색으로 바뀌는 순간 즉시 탭하세요!</small></div>
 <div class="stats">
-  <div class="box">마지막 <span id="last">–</span></div>
-  <div class="box">평균 <span id="avg">–</span></div>
-  <div class="box">최고 <span id="best">–</span></div>
+  <div class="box"><span data-ko="마지막 " data-en="Last ">마지막 </span><span id="last">–</span></div>
+  <div class="box"><span data-ko="평균 " data-en="Avg ">평균 </span><span id="avg">–</span></div>
+  <div class="box"><span data-ko="최고 " data-en="Best ">최고 </span><span id="best">–</span></div>
 </div>
 <div class="runs" id="runs"></div>
-<p class="hint">총 5회 측정합니다. 초록불 전에 누르면 실패! 인간 평균은 약 250ms입니다.</p>
+<p class="hint" data-ko="총 5회 측정합니다. 초록불 전에 누르면 실패! 인간 평균은 약 250ms입니다." data-en="5 rounds total. Tapping before green fails! The human average is about 250ms.">총 5회 측정합니다. 초록불 전에 누르면 실패! 인간 평균은 약 250ms입니다.</p>
 
 <script>
 const pad=document.getElementById('pad');
@@ -51,28 +51,28 @@ function begin(){
 }
 function next(){
   if(times.length>=5){finish();return;}
-  state='wait';setPad('wait','준비...','초록색이 되면 탭!');
+  state='wait';setPad('wait',t('준비...','Ready...'),t('초록색이 되면 탭!','Tap when green!'));
   const delay=900+Math.random()*2600;
-  timeoutId=setTimeout(()=>{state='ready';startT=performance.now();setPad('ready','지금 탭!','');},delay);
+  timeoutId=setTimeout(()=>{state='ready';startT=performance.now();setPad('ready',t('지금 탭!','Tap now!'),'');},delay);
 }
 function finish(){
   const avg=Math.round(times.reduce((a,b)=>a+b,0)/times.length);
   const bestRun=Math.min(...times);
   if(!best||bestRun<best){best=bestRun;localStorage.setItem('reaction_best',best);}
   bestEl.textContent=best+'ms';avgEl.textContent=avg+'ms';
-  state='idle';setPad('result',`완료! 평균 ${avg}ms`,'탭하여 다시 측정');
+  state='idle';setPad('result',t(`완료! 평균 ${avg}ms`,`Done! Avg ${avg}ms`),t('탭하여 다시 측정','Tap to test again'));
 }
 function tap(){
   if(state==='idle'||state==='result'){begin();return;}
   if(state==='wait'){ // too early
-    clearTimeout(timeoutId);state='early';setPad('early','너무 빨라요! 😅','탭하여 계속');
+    clearTimeout(timeoutId);state='early';setPad('early',t('너무 빨라요! 😅','Too early! 😅'),t('탭하여 계속','Tap to continue'));
     state='idle';return;
   }
   if(state==='ready'){
     const t=Math.round(performance.now()-startT);
     times.push(t);lastEl.textContent=t+'ms';
     const s=document.createElement('span');s.textContent=`#${times.length}: ${t}ms`;runsEl.appendChild(s);
-    state='between';setPad('idle',`${t}ms 👍`,'탭하여 다음');
+    state='between';setPad('idle',`${t}ms 👍`,window.t('탭하여 다음','Tap for next'));
     return;
   }
   if(state==='between'){next();}

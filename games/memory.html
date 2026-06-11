@@ -36,22 +36,22 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>🃏 카드 짝맞추기</b><span></span></div>
-<h1>카드 짝맞추기</h1>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🃏 카드 짝맞추기</b><span></span></div>
+<h1 data-ko="카드 짝맞추기" data-en="Memory Match">카드 짝맞추기</h1>
 <div class="controls">
-  <button class="diff sel" data-c="12">쉬움 (6쌍)</button>
-  <button class="diff" data-c="20">보통 (10쌍)</button>
-  <button class="diff" data-c="30">어려움 (15쌍)</button>
+  <button class="diff sel" data-c="12" data-ko="쉬움 (6쌍)" data-en="Easy (6 pairs)">쉬움 (6쌍)</button>
+  <button class="diff" data-c="20" data-ko="보통 (10쌍)" data-en="Normal (10 pairs)">보통 (10쌍)</button>
+  <button class="diff" data-c="30" data-ko="어려움 (15쌍)" data-en="Hard (15 pairs)">어려움 (15쌍)</button>
 </div>
-<div class="stats"><span>🔄 시도 <span id="moves">0</span></span><span>✅ <span id="pairs">0</span></span><span>⏱️ <span id="time">0</span>s</span></div>
+<div class="stats"><span>🔄 <span data-ko="시도" data-en="Moves">시도</span> <span id="moves">0</span></span><span>✅ <span id="pairs">0</span></span><span>⏱️ <span id="time">0</span>s</span></div>
 <div id="board"></div>
-<p class="hint">카드를 뒤집어 같은 그림 두 장을 찾으세요. 적은 시도로 클리어!</p>
+<p class="hint" data-ko="카드를 뒤집어 같은 그림 두 장을 찾으세요. 적은 시도로 클리어!" data-en="Flip cards to find matching pairs. Clear with as few moves as possible!">카드를 뒤집어 같은 그림 두 장을 찾으세요. 적은 시도로 클리어!</p>
 
 <div class="overlay hidden" id="endScreen">
-  <h2>🎉 클리어!</h2>
+  <h2 data-ko="🎉 클리어!" data-en="🎉 Cleared!">🎉 클리어!</h2>
   <p id="endStats" style="font-size:1.2rem"></p>
-  <button class="btn" id="restartBtn">🔄 다시하기</button>
-  <a class="btn alt" href="../index.html">🏠 홈으로</a>
+  <button class="btn" id="restartBtn" data-ko="🔄 다시하기" data-en="🔄 Play Again">🔄 다시하기</button>
+  <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
 </div>
 
 <script>
@@ -109,9 +109,9 @@ function win(){
   clearInterval(timerIv);
   const key='memory_best_'+count;const prev=localStorage.getItem(key);
   let rec='';const sc=moves;
-  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec='<br>🏆 최소 시도 신기록!';}
-  else rec='<br>최소 시도 기록: '+prev;
-  document.getElementById('endStats').innerHTML=`시도: <b>${moves}</b> · 시간: ${timer}초${rec}`;
+  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=t('<br>🏆 최소 시도 신기록!','<br>🏆 New fewest-moves record!');}
+  else rec=t('<br>최소 시도 기록: '+prev,'<br>Fewest moves record: '+prev);
+  document.getElementById('endStats').innerHTML=t(`시도: <b>${moves}</b> · 시간: ${timer}초${rec}`,`Moves: <b>${moves}</b> · Time: ${timer}s${rec}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 document.getElementById('restartBtn').onclick=newGame;

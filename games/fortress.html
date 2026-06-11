@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>💥 포트리스 포격전</title>
+<title data-ko="💥 포트리스 포격전" data-en="💥 Artillery Duel">💥 포트리스 포격전</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0a0e1a;color:#eee;
@@ -38,14 +38,14 @@
 <div id="wrap">
   <canvas id="cv" width="900" height="500"></canvas>
   <div class="overlay" id="startScreen">
-    <h2>포트리스 포격전</h2>
-    <p class="hint">각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다.</p>
+    <h2 data-ko="포트리스 포격전" data-en="Artillery Duel">포트리스 포격전</h2>
+    <p class="hint" data-ko="각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다." data-en="Adjust angle and power to hit the enemy tank. Wind affects your shot and the terrain gets destroyed.">각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다.</p>
     <div class="modes">
-      <div class="mode sel" data-mode="ai"><b>🤖 vs AI</b></div>
-      <div class="mode" data-mode="2p"><b>👥 2인 대전</b></div>
+      <div class="mode sel" data-mode="ai"><b data-ko="🤖 vs AI" data-en="🤖 vs AI">🤖 vs AI</b></div>
+      <div class="mode" data-mode="2p"><b data-ko="👥 2인 대전" data-en="👥 2 Players">👥 2인 대전</b></div>
     </div>
-    <button class="btn" id="startBtn">전투 시작 ▶</button>
-    <p class="hint"><kbd>←</kbd><kbd>→</kbd> 각도 · <kbd>↑</kbd><kbd>↓</kbd> 파워 · <kbd>Space</kbd> 발사</p>
+    <button class="btn" id="startBtn" data-ko="전투 시작 ▶" data-en="Start Battle ▶">전투 시작 ▶</button>
+    <p class="hint"><kbd>←</kbd><kbd>→</kbd> <span data-ko="각도 ·" data-en="angle ·">각도 ·</span> <kbd>↑</kbd><kbd>↓</kbd> <span data-ko="파워 ·" data-en="power ·">파워 ·</span> <kbd>Space</kbd> <span data-ko="발사" data-en="fire">발사</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -56,10 +56,10 @@
   </div>
 </div>
 <div id="controls">
-  <div class="ctl">각도<b id="angV">45°</b></div>
-  <div class="ctl">파워<b id="powV">50</b></div>
-  <div class="ctl">바람<b id="windV">→ 0</b></div>
-  <button id="fireBtn">발사 🔥</button>
+  <div class="ctl"><span data-ko="각도" data-en="Angle">각도</span><b id="angV">45°</b></div>
+  <div class="ctl"><span data-ko="파워" data-en="Power">파워</span><b id="powV">50</b></div>
+  <div class="ctl"><span data-ko="바람" data-en="Wind">바람</span><b id="windV">→ 0</b></div>
+  <button id="fireBtn" data-ko="발사 🔥" data-en="Fire 🔥">발사 🔥</button>
 </div>
 
 <script>
@@ -87,8 +87,8 @@ function groundY(x){x=Math.max(0,Math.min(W-1,Math.round(x)));return terrain[x];
 function initTanks(){
   const x1=80+Math.random()*60, x2=W-140-Math.random()*60;
   tanks=[
-    {x:x1,color:'#5f9fff',name:'플레이어 1',hp:100,angle:45,power:50,aim:1},
-    {x:x2,color:'#ff5f6d',name:mode==='ai'?'AI':'플레이어 2',hp:100,angle:135,power:50,aim:-1},
+    {x:x1,color:'#5f9fff',name:t('플레이어 1','Player 1'),hp:100,angle:45,power:50,aim:1},
+    {x:x2,color:'#ff5f6d',name:mode==='ai'?'AI':t('플레이어 2','Player 2'),hp:100,angle:135,power:50,aim:-1},
   ];
 }
 function newWind(){wind=(Math.random()*2-1)*0.06;}
@@ -107,7 +107,7 @@ function updateHUD(){
   document.getElementById('powV').textContent=Math.round(t.power);
   const ws=Math.abs(wind)*100;
   document.getElementById('windV').textContent=(wind>=0?'→ ':'← ')+ws.toFixed(0);
-  turnLabel.innerHTML=`<span style="color:${t.color}">● ${t.name}</span> 턴`;
+  turnLabel.innerHTML=window.t(`<span style="color:${t.color}">● ${t.name}</span> 턴`,`<span style="color:${t.color}">● ${t.name}</span>'s turn`);
 }
 
 let keys={};
@@ -159,7 +159,7 @@ function nextTurn(){
   if(tanks[0].hp<=0||tanks[1].hp<=0){
     state='over';
     const winner=tanks[0].hp<=0?tanks[1]:tanks[0];
-    document.getElementById('endTitle').innerHTML=`🏆 <span style="color:${winner.color}">${winner.name}</span> 승리!`;
+    document.getElementById('endTitle').innerHTML=window.t(`🏆 <span style="color:${winner.color}">${winner.name}</span> 승리!`,`🏆 <span style="color:${winner.color}">${winner.name}</span> wins!`);
     endScreen.classList.remove('hidden');return;
   }
   turn=1-turn; newWind(); state='aim'; updateHUD();
@@ -252,7 +252,7 @@ function draw(){
   }
   for(const p of particles){ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();}
   ctx.globalAlpha=1;
-  if(mode==='ai'&&turn===1&&state==='aim'){ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText('🤖 AI가 조준 중...',W/2,30);}
+  if(mode==='ai'&&turn===1&&state==='aim'){ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(window.t('🤖 AI가 조준 중...','🤖 AI is aiming...'),W/2,30);}
 }
 
 function loop(){if(state!=='menu')update();if(tanks)draw();requestAnimationFrame(loop);}
@@ -263,7 +263,7 @@ requestAnimationFrame(loop);
 <script>
 TC.make({
   dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'},repeat:true},
-  right:[{label:'🔥',sub:'발사',key:' ',cls:'big'}]
+  right:[{label:'🔥',sub:window.t('발사','Fire'),key:' ',cls:'big'}]
 });
 </script>
 </body>

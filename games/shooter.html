@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🔫 탑다운 슈팅</title>
+<title data-ko="🔫 탑다운 슈팅" data-en="🔫 Top-Down Shooter">🔫 탑다운 슈팅</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0d0d14;color:#eee;
@@ -32,22 +32,22 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><h1>🔫 탑다운 슈팅</h1><span id="modeLabel"></span></div>
+<div class="topbar"><a href="../index.html">← 메인으로</a><h1 data-ko="🔫 탑다운 슈팅" data-en="🔫 Top-Down Shooter">🔫 탑다운 슈팅</h1><span id="modeLabel"></span></div>
 <div id="wrap">
   <canvas id="cv" width="900" height="560"></canvas>
 
   <div class="overlay" id="startScreen">
-    <h2>탑다운 슈팅</h2>
-    <p class="hint">모드를 선택하고 시작하세요.</p>
+    <h2 data-ko="탑다운 슈팅" data-en="Top-Down Shooter">탑다운 슈팅</h2>
+    <p class="hint" data-ko="모드를 선택하고 시작하세요." data-en="Pick a mode and start.">모드를 선택하고 시작하세요.</p>
     <div class="modes">
-      <div class="mode sel" data-mode="deathmatch"><h3>💀 데스매치</h3><p>적 4명을 모두 처치하면 승리</p></div>
-      <div class="mode" data-mode="infinite"><h3>♾️ 무한모드</h3><p>끝없이 몰려오는 적, 최고 킬 도전</p></div>
+      <div class="mode sel" data-mode="deathmatch"><h3 data-ko="💀 데스매치" data-en="💀 Deathmatch">💀 데스매치</h3><p data-ko="적 4명을 모두 처치하면 승리" data-en="Eliminate all 4 enemies to win">적 4명을 모두 처치하면 승리</p></div>
+      <div class="mode" data-mode="infinite"><h3 data-ko="♾️ 무한모드" data-en="♾️ Endless">♾️ 무한모드</h3><p data-ko="끝없이 몰려오는 적, 최고 킬 도전" data-en="Endless waves of enemies — chase the high kill count">끝없이 몰려오는 적, 최고 킬 도전</p></div>
     </div>
     <button class="btn" id="startBtn">게임 시작 ▶</button>
     <p class="hint">
-      🖥️ PC: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 마우스 조준 ·
-      <kbd>좌클릭</kbd> 발사 · <kbd>R</kbd> 재장전 · <kbd>Shift</kbd> 달리기<br>
-      📱 모바일: 왼쪽 <b>D-패드</b> 이동 · <b>화면을 터치</b>하면 그 방향으로 조준·자동발사 · 오른쪽 버튼 재장전/달리기
+      <span data-ko="🖥️ PC:" data-en="🖥️ PC:">🖥️ PC:</span> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span data-ko="이동 · 마우스 조준 ·" data-en="move · mouse aim ·">이동 · 마우스 조준 ·</span>
+      <kbd data-ko="좌클릭" data-en="Left-click">좌클릭</kbd> <span data-ko="발사 ·" data-en="fire ·">발사 ·</span> <kbd>R</kbd> <span data-ko="재장전 ·" data-en="reload ·">재장전 ·</span> <kbd>Shift</kbd> <span data-ko="달리기" data-en="sprint">달리기</span><br>
+      <span data-ko="📱 모바일: 왼쪽" data-en="📱 Mobile: left">📱 모바일: 왼쪽</span> <b>D-패드</b> <span data-ko="이동 ·" data-en="move ·">이동 ·</span> <b data-ko="화면을 터치" data-en="touch the screen">화면을 터치</b><span data-ko="하면 그 방향으로 조준·자동발사 · 오른쪽 버튼 재장전/달리기" data-en=" to aim & auto-fire that direction · right buttons reload/sprint">하면 그 방향으로 조준·자동발사 · 오른쪽 버튼 재장전/달리기</span>
     </p>
   </div>
 
@@ -139,20 +139,20 @@ function startGame(){
   else { for(let i=0;i<3;i++) enemies.push(makeEnemy()); }
   state='play';
   startScreen.classList.add('hidden'); endScreen.classList.add('hidden'); pauseScreen.classList.add('hidden');
-  modeLabel.textContent = mode==='deathmatch'?'💀 데스매치':'♾️ 무한모드';
+  modeLabel.textContent = mode==='deathmatch'?t('💀 데스매치','💀 Deathmatch'):t('♾️ 무한모드','♾️ Endless');
   lastTime=performance.now();
 }
 
 function endGame(win){
   state='over';
-  document.getElementById('endTitle').textContent = win?'🏆 승리!':'💀 게임 오버';
+  document.getElementById('endTitle').textContent = win?t('🏆 승리!','🏆 Victory!'):t('💀 게임 오버','💀 Game Over');
   const key='shooter_best_'+mode, prevBest=parseInt(localStorage.getItem(key)||'0');
   const isNew=kills>prevBest; if(isNew)localStorage.setItem(key,kills);
   const bestNow=Math.max(prevBest,kills);
-  let stats = `처치한 적: <b>${kills}</b>`;
-  if(mode==='infinite') stats += ` · 웨이브: <b>${wave}</b>`;
-  stats += `<br>🏆 최고 기록: <b>${bestNow}</b>킬${isNew?' 🎉 신기록!':''}`;
-  stats += `<br><span style="font-size:.76rem;color:#667">기록은 이 기기에만 저장됩니다</span>`;
+  let stats = t(`처치한 적: <b>${kills}</b>`,`Enemies eliminated: <b>${kills}</b>`);
+  if(mode==='infinite') stats += t(` · 웨이브: <b>${wave}</b>`,` · Wave: <b>${wave}</b>`);
+  stats += t(`<br>🏆 최고 기록: <b>${bestNow}</b>킬${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best: <b>${bestNow}</b> kills${isNew?' 🎉 New record!':''}`);
+  stats += t(`<br><span style="font-size:.76rem;color:#667">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#667">Records are saved on this device only</span>`);
   document.getElementById('endStats').innerHTML = stats;
   endScreen.classList.remove('hidden');
 }
@@ -369,7 +369,7 @@ function drawHUD(){
   // ammo
   ctx.font='bold 20px sans-serif';ctx.textAlign='right';
   ctx.fillStyle=player.reloading>0?'#ffc371':'#fff';
-  const ammoTxt=player.reloading>0?'재장전...':`${player.ammo} / ${player.reserve}`;
+  const ammoTxt=player.reloading>0?t('재장전...','Reloading...'):`${player.ammo} / ${player.reserve}`;
   ctx.fillText(ammoTxt,W-20,H-22);
   if(player.reloading>0){
     ctx.fillStyle='#333';ctx.fillRect(W-150,H-18,130,5);
@@ -378,8 +378,8 @@ function drawHUD(){
   // kills/wave
   ctx.textAlign='left';ctx.font='bold 16px sans-serif';ctx.fillStyle='#fff';
   ctx.fillText('💀 '+kills,20,28);
-  if(mode==='infinite')ctx.fillText('🌊 웨이브 '+wave,20,50);
-  else ctx.fillText('남은 적: '+enemies.length,20,50);
+  if(mode==='infinite')ctx.fillText(t('🌊 웨이브 ','🌊 Wave ')+wave,20,50);
+  else ctx.fillText(t('남은 적: ','Enemies left: ')+enemies.length,20,50);
 }
 
 function loop(t){
@@ -397,7 +397,7 @@ requestAnimationFrame(loop);
 TC.make({
   landscape:true,
   dpad:{keys:{up:'w',down:'s',left:'a',right:'d'}},
-  right:[{label:'🔄',sub:'재장전',key:'r'},{label:'🏃',sub:'달리기',key:'Shift'}]
+  right:[{label:'🔄',sub:t('재장전','Reload'),key:'r'},{label:'🏃',sub:t('달리기','Sprint'),key:'Shift'}]
 });
 // 캔버스 터치 = 조준 + 사격
 (function(){

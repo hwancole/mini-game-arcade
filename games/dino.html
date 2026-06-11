@@ -29,12 +29,12 @@
   <canvas id="cv" width="800" height="300"></canvas>
   <div class="overlay" id="startScreen">
     <h2>다이노 런</h2>
-    <p class="hint">선인장은 점프로 피하고, 새는 숙여서 피하세요! 갈수록 빨라집니다.</p>
+    <p class="hint" data-ko="선인장은 점프로 피하고, 새는 숙여서 피하세요! 갈수록 빨라집니다." data-en="Jump over the cacti and duck under the birds! It gets faster as you go.">선인장은 점프로 피하고, 새는 숙여서 피하세요! 갈수록 빨라집니다.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>Space</kbd>/<kbd>↑</kbd>/탭 점프 · <kbd>↓</kbd>/아래 숙이기</p>
+    <p class="hint"><kbd>Space</kbd>/<kbd>↑</kbd>/<span data-ko="탭 점프" data-en="Tap to jump">탭 점프</span> · <kbd>↓</kbd>/<span data-ko="아래 숙이기" data-en="Down to duck">아래 숙이기</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
-    <h2>게임 오버</h2>
+    <h2 data-ko="게임 오버" data-en="Game Over">게임 오버</h2>
     <p class="hint" id="endStats"></p>
     <button class="btn" id="restartBtn">🔄 재시작</button>
     <a class="btn alt" href="../index.html">🏠 홈으로</a>
@@ -111,7 +111,7 @@ function update(){
 function gameOver(){
   state='over';
   if(score>best){best=Math.floor(score);localStorage.setItem('dino_best',best);}
-  document.getElementById('endStats').innerHTML=`거리: <b>${Math.floor(score)}</b><br>최고: ${best}`;
+  document.getElementById('endStats').innerHTML=t(`거리: <b>${Math.floor(score)}</b><br>최고: ${best}`,`Distance: <b>${Math.floor(score)}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
@@ -161,7 +161,7 @@ requestAnimationFrame(loop);
 </script>
 <script src="_controls.js"></script>
 <script>
-TC.make({ left:[{label:'⤓',sub:'숙이기',key:'ArrowDown',cls:'big'}], right:[{label:'⤴',sub:'점프',key:'ArrowUp',cls:'big'}] });
+TC.make({ left:[{label:'⤓',sub:t('숙이기','Duck'),key:'ArrowDown',cls:'big'}], right:[{label:'⤴',sub:t('점프','Jump'),key:'ArrowUp',cls:'big'}] });
 </script>
 </body>
 </html>

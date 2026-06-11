@@ -29,9 +29,9 @@
   <canvas id="cv" width="480" height="480"></canvas>
   <div class="overlay" id="startScreen">
     <h2>팩맨</h2>
-    <p class="hint">미로의 점을 모두 먹으세요! 유령에 닿으면 목숨이 줄어듭니다.<br>💊 파워펠릿을 먹으면 잠시 유령을 잡을 수 있어요!</p>
+    <p class="hint"><span data-ko="미로의 점을 모두 먹으세요! 유령에 닿으면 목숨이 줄어듭니다." data-en="Eat all the dots in the maze! Touching a ghost costs you a life.">미로의 점을 모두 먹으세요! 유령에 닿으면 목숨이 줄어듭니다.</span><br>💊 <span data-ko="파워펠릿을 먹으면 잠시 유령을 잡을 수 있어요!" data-en="Eat a power pellet to chomp ghosts for a short time!">파워펠릿을 먹으면 잠시 유령을 잡을 수 있어요!</span></p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>방향키</kbd> · 스와이프 · 아래 버튼으로 이동</p>
+    <p class="hint"><kbd data-ko="방향키" data-en="Arrows">방향키</kbd> · <span data-ko="스와이프 · 아래 버튼으로 이동" data-en="Swipe · or use the buttons below">스와이프 · 아래 버튼으로 이동</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -166,12 +166,12 @@ function loseLife(){
 function win(){ end(true); }
 function end(w){
   state='over';
-  document.getElementById('endTitle').textContent=w?'🏆 클리어!':'💀 게임 오버';
+  document.getElementById('endTitle').textContent=w?t('🏆 클리어!','🏆 Clear!'):t('💀 게임 오버','💀 Game Over');
   const key='pacman_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b>`+
-    `<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`+
-    `<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b>`,`Score: <b>${score}</b>`)+
+    t(`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 New Record!':''}`)+
+    t(`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span>`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 

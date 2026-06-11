@@ -24,16 +24,16 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>🔴 사목</b><span></span></div>
-<h1>사목 (Connect Four)</h1>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🔴 사목</b><span></span></div>
+<h1 data-ko="사목 (Connect Four)" data-en="Connect Four">사목 (Connect Four)</h1>
 <div class="controls">
   <button class="opt sel" data-m="ai">🤖 vs AI</button>
-  <button class="opt" data-m="2p">👥 2인 대전</button>
+  <button class="opt" data-m="2p" data-ko="👥 2인 대전" data-en="👥 2 Players">👥 2인 대전</button>
 </div>
 <div id="status">🔴 빨강 차례</div>
 <div id="wrap"><canvas id="cv" width="490" height="560"></canvas></div>
-<button class="btn" id="resetBtn">🔄 새 게임</button>
-<p class="hint">열을 클릭해 말을 떨어뜨리세요. 가로·세로·대각선으로 4개를 먼저 연결하면 승리!</p>
+<button class="btn" id="resetBtn" data-ko="🔄 새 게임" data-en="🔄 New Game">🔄 새 게임</button>
+<p class="hint" data-ko="열을 클릭해 말을 떨어뜨리세요. 가로·세로·대각선으로 4개를 먼저 연결하면 승리!" data-en="Click a column to drop a disc. Connect 4 in a row horizontally, vertically, or diagonally to win!">열을 클릭해 말을 떨어뜨리세요. 가로·세로·대각선으로 4개를 먼저 연결하면 승리!</p>
 
 <script>
 const COLS=7,ROWS=6,CELL=70,PAD=0;
@@ -47,7 +47,7 @@ document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
 function reset(){
   board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
   turn=1;over=false;winCells=[];anim=null;
-  statusEl.textContent='🔴 빨강 차례';statusEl.style.color='#ff5f6d';
+  statusEl.textContent=t('🔴 빨강 차례','🔴 Red\'s turn');statusEl.style.color='#ff5f6d';
   draw();
 }
 document.getElementById('resetBtn').onclick=reset;
@@ -62,10 +62,10 @@ function place(c,player,cb){
 function settle(c,r,player){
   board[r][c]=player;
   const w=checkWin(r,c,player);
-  if(w){over=true;winCells=w;statusEl.textContent=(player===1?'🔴 빨강':'🟡 노랑')+' 승리! 🎉';statusEl.style.color=player===1?'#ff5f6d':'#ffd35f';return;}
-  if(board[0].every(v=>v)){over=true;statusEl.textContent='무승부!';statusEl.style.color='#aaa';return;}
+  if(w){over=true;winCells=w;statusEl.textContent=(player===1?t('🔴 빨강','🔴 Red'):t('🟡 노랑','🟡 Yellow'))+t(' 승리! 🎉',' wins! 🎉');statusEl.style.color=player===1?'#ff5f6d':'#ffd35f';return;}
+  if(board[0].every(v=>v)){over=true;statusEl.textContent=t('무승부!','Draw!');statusEl.style.color='#aaa';return;}
   turn=3-player;
-  statusEl.textContent=turn===1?'🔴 빨강 차례':'🟡 노랑 차례';
+  statusEl.textContent=turn===1?t('🔴 빨강 차례','🔴 Red\'s turn'):t('🟡 노랑 차례','🟡 Yellow\'s turn');
   statusEl.style.color=turn===1?'#ff5f6d':'#ffd35f';
   if(mode==='ai'&&turn===2&&!over)setTimeout(aiMove,400);
 }

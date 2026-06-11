@@ -46,20 +46,20 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>✏️ 스도쿠</b><span></span></div>
-<h1>스도쿠</h1>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b data-ko="✏️ 스도쿠" data-en="✏️ Sudoku">✏️ 스도쿠</b><span></span></div>
+<h1 data-ko="스도쿠" data-en="Sudoku">스도쿠</h1>
 <div class="controls">
-  <button class="opt sel" data-d="easy">쉬움</button>
-  <button class="opt" data-d="normal">보통</button>
-  <button class="opt" data-d="hard">어려움</button>
-  <button class="opt" id="newBtn" style="border-color:#5fffac;color:#5fffac">새 퍼즐</button>
+  <button class="opt sel" data-d="easy" data-ko="쉬움" data-en="Easy">쉬움</button>
+  <button class="opt" data-d="normal" data-ko="보통" data-en="Normal">보통</button>
+  <button class="opt" data-d="hard" data-ko="어려움" data-en="Hard">어려움</button>
+  <button class="opt" id="newBtn" style="border-color:#5fffac;color:#5fffac" data-ko="새 퍼즐" data-en="New Puzzle">새 퍼즐</button>
 </div>
 <div class="stats"><span>⏱️ <span id="time">0</span>s</span><span>❌ <span id="errs">0</span></span><span>💡 <span id="hints">3</span></span></div>
 <div id="grid"></div>
 <div class="pad" id="pad"></div>
 
-<div class="overlay hidden" id="winScreen"><h2>🎉 완성!</h2><p id="winStats"></p><button class="btn" id="winBtn">새 퍼즐</button><a class="btn alt" href="../index.html" style="margin-left:6px">🏠 홈으로</a></div>
-<p class="hint">칸을 선택하고 숫자를 입력하세요 · ✏️ 메모 모드로 후보 표시 · 💡 힌트는 제한적</p>
+<div class="overlay hidden" id="winScreen"><h2 data-ko="🎉 완성!" data-en="🎉 Complete!">🎉 완성!</h2><p id="winStats"></p><button class="btn" id="winBtn" data-ko="새 퍼즐" data-en="New Puzzle">새 퍼즐</button><a class="btn alt" href="../index.html" style="margin-left:6px" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a></div>
+<p class="hint" data-ko="칸을 선택하고 숫자를 입력하세요 · ✏️ 메모 모드로 후보 표시 · 💡 힌트는 제한적" data-en="Select a cell and enter a number · ✏️ Note mode marks candidates · 💡 Hints are limited">칸을 선택하고 숫자를 입력하세요 · ✏️ 메모 모드로 후보 표시 · 💡 힌트는 제한적</p>
 
 <script>
 const gridEl=document.getElementById('grid'),padEl=document.getElementById('pad');
@@ -134,11 +134,11 @@ function buildGrid(){
 function updatePad(){
   padEl.innerHTML='';
   for(let n=1;n<=9;n++){const b=document.createElement('button');b.textContent=n;b.onclick=()=>input(n);padEl.appendChild(b);}
-  const erase=document.createElement('button');erase.className='act';erase.textContent='지움';erase.onclick=()=>input(0);padEl.appendChild(erase);
-  const note=document.createElement('button');note.className='act';note.id='noteBtn';note.textContent='✏️ 메모';note.onclick=()=>{noteMode=!noteMode;note.classList.toggle('on',noteMode);};padEl.appendChild(note);
-  const hint=document.createElement('button');hint.className='act';hint.textContent='💡 힌트';hint.onclick=useHint;padEl.appendChild(hint);
+  const erase=document.createElement('button');erase.className='act';erase.textContent=t('지움','Erase');erase.onclick=()=>input(0);padEl.appendChild(erase);
+  const note=document.createElement('button');note.className='act';note.id='noteBtn';note.textContent=t('✏️ 메모','✏️ Notes');note.onclick=()=>{noteMode=!noteMode;note.classList.toggle('on',noteMode);};padEl.appendChild(note);
+  const hint=document.createElement('button');hint.className='act';hint.textContent=t('💡 힌트','💡 Hint');hint.onclick=useHint;padEl.appendChild(hint);
   // pad row 2 has 5 slots: erase,note,hint + 2 empty -> add spacers
-  const undo=document.createElement('button');undo.className='act';undo.textContent='✔ 체크';undo.onclick=checkErrors;padEl.appendChild(undo);
+  const undo=document.createElement('button');undo.className='act';undo.textContent=t('✔ 체크','✔ Check');undo.onclick=checkErrors;padEl.appendChild(undo);
   const blank=document.createElement('button');blank.className='act';blank.style.visibility='hidden';padEl.appendChild(blank);
 }
 function input(n){
@@ -182,8 +182,8 @@ function checkWin(){
   for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(puzzle[r][c]!==solution[r][c])return;
   clearInterval(timerIv);
   const key='sudoku_best_'+diff,prev=localStorage.getItem(key);let rec='';
-  if(!prev||timer<+prev){localStorage.setItem(key,timer);rec=' (신기록!)';}
-  document.getElementById('winStats').innerHTML=`시간 ${timer}초 · 실수 ${errs}회${rec}`;
+  if(!prev||timer<+prev){localStorage.setItem(key,timer);rec=t(' (신기록!)',' (New record!)');}
+  document.getElementById('winStats').innerHTML=t(`시간 ${timer}초 · 실수 ${errs}회${rec}`,`Time ${timer}s · ${errs} mistakes${rec}`);
   document.getElementById('winScreen').classList.remove('hidden');
 }
 document.querySelectorAll('.opt[data-d]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-d]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');diff=o.dataset.d;newGame();});

@@ -36,11 +36,11 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>🧮 빠른 암산</b><span></span></div>
-<h1>빠른 암산</h1>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b data-ko="🧮 빠른 암산" data-en="🧮 Quick Math">🧮 빠른 암산</b><span></span></div>
+<h1 data-ko="빠른 암산" data-en="Quick Math">빠른 암산</h1>
 <div class="stats">
   <div class="box">⭐ <span id="score">0</span></div>
-  <div class="box">🔥 콤보 <span id="combo">0</span></div>
+  <div class="box">🔥 <span data-ko="콤보" data-en="Combo">콤보</span> <span id="combo">0</span></div>
   <div class="box">✅ <span id="correct">0</span></div>
   <div class="box">🏆 <span id="best">0</span></div>
 </div>
@@ -49,20 +49,20 @@
 <div class="answers" id="answers"></div>
 
 <div class="overlay" id="startScreen">
-  <h2>빠른 암산</h2>
-  <p class="hint">제한시간 안에 정답을 고르세요! 맞히면 시간이 조금 회복되고, 콤보가 쌓일수록 고득점.</p>
+  <h2 data-ko="빠른 암산" data-en="Quick Math">빠른 암산</h2>
+  <p class="hint" data-ko="제한시간 안에 정답을 고르세요! 맞히면 시간이 조금 회복되고, 콤보가 쌓일수록 고득점." data-en="Pick the correct answer before time runs out! Correct answers restore a bit of time, and bigger combos mean higher scores.">제한시간 안에 정답을 고르세요! 맞히면 시간이 조금 회복되고, 콤보가 쌓일수록 고득점.</p>
   <div class="modes">
-    <div class="mode sel" data-d="easy">쉬움</div>
-    <div class="mode" data-d="normal">보통</div>
-    <div class="mode" data-d="hard">어려움</div>
+    <div class="mode sel" data-d="easy" data-ko="쉬움" data-en="Easy">쉬움</div>
+    <div class="mode" data-d="normal" data-ko="보통" data-en="Normal">보통</div>
+    <div class="mode" data-d="hard" data-ko="어려움" data-en="Hard">어려움</div>
   </div>
-  <button class="btn" id="startBtn">시작 ▶</button>
+  <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
 </div>
 <div class="overlay hidden" id="endScreen">
-  <h2>⏰ 종료!</h2>
+  <h2 data-ko="⏰ 종료!" data-en="⏰ Time's Up!">⏰ 종료!</h2>
   <p id="endStats" style="font-size:1.2rem"></p>
-  <button class="btn" id="restartBtn">🔄 다시하기</button>
-  <a class="btn alt" href="../index.html">🏠 홈으로</a>
+  <button class="btn" id="restartBtn" data-ko="🔄 다시하기" data-en="🔄 Retry">🔄 다시하기</button>
+  <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
 </div>
 
 <script>
@@ -122,7 +122,7 @@ function tick(t){
 function end(){
   running=false;timeFill.style.width='0%';
   if(score>best){best=score;localStorage.setItem('math_best',best);bestEl.textContent=best;}
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 정답 ${correct}개<br>최고: ${best}`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 정답 ${correct}개<br>최고: ${best}`,`Score: <b>${score}</b> · ${correct} correct<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 document.getElementById('startBtn').onclick=start;

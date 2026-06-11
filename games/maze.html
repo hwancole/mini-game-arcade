@@ -35,10 +35,10 @@
 <div class="stats"><span>👣 <span id="moves">0</span></span><span>⏱️ <span id="time">0</span>s</span><span>🏆 <span id="best">–</span></span></div>
 <div id="wrap">
   <canvas id="cv" width="500" height="500"></canvas>
-  <div class="overlay hidden" id="winScreen"><h2>🎉 탈출 성공!</h2><p id="winStats"></p><button class="btn" id="winBtn">새 미로</button><a class="btn alt" href="../index.html" style="margin-left:6px">🏠 홈으로</a></div>
+  <div class="overlay hidden" id="winScreen"><h2 data-ko="🎉 탈출 성공!" data-en="🎉 Escaped!">🎉 탈출 성공!</h2><p id="winStats"></p><button class="btn" id="winBtn">새 미로</button><a class="btn alt" href="../index.html" style="margin-left:6px">🏠 홈으로</a></div>
 </div>
 <button class="btn" id="newBtn" style="margin:10px">🔀 새 미로</button>
-<p class="hint">🟣에서 🟢까지! 방향키 · 스와이프 · 아래 버튼으로 이동하세요.</p>
+<p class="hint" data-ko="🟣에서 🟢까지! 방향키 · 스와이프 · 아래 버튼으로 이동하세요." data-en="🟣 to 🟢! Move with arrow keys, swipes, or the buttons below.">🟣에서 🟢까지! 방향키 · 스와이프 · 아래 버튼으로 이동하세요.</p>
 
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -87,9 +87,9 @@ function win(){
   won=true;clearInterval(timerIv);
   const key='maze_best_'+N,prev=localStorage.getItem(key);let rec='';
   const sc=timer;
-  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=' (신기록!)';}
+  if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=t(' (신기록!)',' (New Record!)');}
   bestEl.textContent=localStorage.getItem(key);
-  document.getElementById('winStats').innerHTML=`${moves}걸음 · ${timer}초${rec}`;
+  document.getElementById('winStats').innerHTML=t(`${moves}걸음 · ${timer}초${rec}`,`${moves} steps · ${timer}s${rec}`);
   document.getElementById('winScreen').classList.remove('hidden');
 }
 function draw(){

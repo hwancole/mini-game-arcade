@@ -28,12 +28,12 @@
   <canvas id="cv" width="420" height="600"></canvas>
   <div class="overlay" id="startScreen">
     <h2>블록 쌓기</h2>
-    <p class="hint">좌우로 움직이는 블록을 탭/클릭으로 멈춰 정확히 쌓으세요.<br>빗나간 부분은 잘려나가고, 완벽하게 맞추면 보너스!</p>
+    <p class="hint" id="startHint">좌우로 움직이는 블록을 탭/클릭으로 멈춰 정확히 쌓으세요.<br>빗나간 부분은 잘려나가고, 완벽하게 맞추면 보너스!</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint">탭 / 클릭 / Space</p>
+    <p class="hint" data-ko="탭 / 클릭 / Space" data-en="Tap / Click / Space">탭 / 클릭 / Space</p>
   </div>
   <div class="overlay hidden" id="endScreen">
-    <h2>무너졌어요!</h2>
+    <h2 data-ko="무너졌어요!" data-en="It collapsed!">무너졌어요!</h2>
     <p class="hint" id="endStats"></p>
     <button class="btn" id="restartBtn">🔄 재시작</button>
     <a class="btn alt" href="../index.html">🏠 홈으로</a>
@@ -47,6 +47,7 @@ const BH=34; // block height
 let stack,cur,score,best,state,camY,combo,particles;
 best=parseInt(localStorage.getItem('stack_best')||'0');
 
+document.getElementById('startHint').innerHTML=t('좌우로 움직이는 블록을 탭/클릭으로 멈춰 정확히 쌓으세요.<br>빗나간 부분은 잘려나가고, 완벽하게 맞추면 보너스!','Tap/click to drop the moving block and stack it precisely.<br>Overhang is sliced off; a perfect hit earns a bonus!');
 function hue(i){return `hsl(${(i*18+180)%360} 65% 58%)`;}
 function start(){
   stack=[{x:W/2-90,w:180,y:H-BH}];
@@ -90,7 +91,7 @@ function spawnSlice(x,y,w){
 function end(){
   state='over';
   if(score>best){best=score;localStorage.setItem('stack_best',best);}
-  document.getElementById('endStats').innerHTML=`높이: <b>${score}</b>층<br>최고: ${best}층`;
+  document.getElementById('endStats').innerHTML=t(`높이: <b>${score}</b>층<br>최고: ${best}층`,`Height: <b>${score}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 

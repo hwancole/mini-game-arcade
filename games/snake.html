@@ -35,13 +35,13 @@
   <canvas id="cv" width="560" height="560"></canvas>
   <div class="overlay" id="startScreen">
     <h2>스네이크</h2>
-    <p class="hint">사과를 먹고 몸을 키우세요. 벽이나 자기 몸에 부딪히면 끝!</p>
+    <p class="hint" data-ko="사과를 먹고 몸을 키우세요. 벽이나 자기 몸에 부딪히면 끝!" data-en="Eat apples to grow longer. Hit a wall or yourself and it's over!">사과를 먹고 몸을 키우세요. 벽이나 자기 몸에 부딪히면 끝!</p>
     <div class="modes">
       <div class="mode sel" data-m="wall">벽 모드</div>
       <div class="mode" data-m="wrap">통과 모드</div>
     </div>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>←↑↓→</kbd> 또는 <kbd>WASD</kbd> 이동</p>
+    <p class="hint"><kbd>←↑↓→</kbd> <span data-ko="또는" data-en="or">또는</span> <kbd>WASD</kbd> <span data-ko="이동" data-en="to move">이동</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2>게임 오버</h2>
@@ -101,7 +101,7 @@ function step(){
 function gameOver(){
   state='over';
   if(score>best){best=score;localStorage.setItem('snake_best',best);bestEl.textContent=best;}
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 길이: ${snake.length}<br>최고: ${best}`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 길이: ${snake.length}<br>최고: ${best}`,`Score: <b>${score}</b> · Length: ${snake.length}<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 

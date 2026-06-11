@@ -32,11 +32,11 @@
   <canvas id="cv" width="520" height="600"></canvas>
   <div class="overlay" id="startScreen">
     <h2>벽돌깨기</h2>
-    <p class="hint">공으로 모든 벽돌을 깨세요! 아이템을 받아 패들을 강화하세요.</p>
+    <p class="hint" data-ko="공으로 모든 벽돌을 깨세요! 아이템을 받아 패들을 강화하세요." data-en="Break all the bricks with the ball! Grab items to power up your paddle.">공으로 모든 벽돌을 깨세요! 아이템을 받아 패들을 강화하세요.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint">🖥️ PC: <kbd>마우스</kbd>/<kbd>←→</kbd> 패들 이동 · <kbd>클릭/Space</kbd> 발사<br>
-    📱 모바일: <b>화면을 좌우로 드래그</b>해 패들 이동 · <b>탭</b>하면 발사<br>
-    🟩 확대 · 🟦 멀티볼 · 🟪 느리게 · 🟥 축소</p>
+    <p class="hint">🖥️ PC: <kbd data-ko="마우스" data-en="Mouse">마우스</kbd>/<kbd>←→</kbd> <span data-ko="패들 이동" data-en="move paddle">패들 이동</span> · <kbd data-ko="클릭/Space" data-en="Click/Space">클릭/Space</kbd> <span data-ko="발사" data-en="launch">발사</span><br>
+    📱 <span data-ko="모바일:" data-en="Mobile:">모바일:</span> <b data-ko="화면을 좌우로 드래그" data-en="Drag left/right">화면을 좌우로 드래그</b><span data-ko="해 패들 이동" data-en=" to move paddle"> 해 패들 이동</span> · <b data-ko="탭" data-en="Tap">탭</b><span data-ko="하면 발사" data-en=" to launch"> 하면 발사</span><br>
+    <span data-ko="🟩 확대 · 🟦 멀티볼 · 🟪 느리게 · 🟥 축소" data-en="🟩 Grow · 🟦 Multiball · 🟪 Slow · 🟥 Shrink">🟩 확대 · 🟦 멀티볼 · 🟪 느리게 · 🟥 축소</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -144,12 +144,12 @@ function update(){
 }
 function end(win){
   state='over';
-  document.getElementById('endTitle').textContent=win?'🏆 클리어!':'💀 게임 오버';
+  document.getElementById('endTitle').textContent=win?t('🏆 클리어!','🏆 Clear!'):t('💀 게임 오버','💀 Game Over');
   const key='breakout_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 레벨 ${level}`+
-    `<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`+
-    `<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 레벨 ${level}`,`Score: <b>${score}</b> · Level ${level}`)+
+    t(`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 New record!':''}`)+
+    t(`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span>`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
@@ -171,7 +171,7 @@ function draw(){
   // items
   ctx.font='18px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
   for(const it of items)ctx.fillText(ICON[it.t],it.x,it.y);
-  if(stuck&&balls.some(b=>b.stuck)){ctx.fillStyle='#fff';ctx.font='13px sans-serif';ctx.fillText('클릭 또는 Space로 발사!',W/2,H-70);}
+  if(stuck&&balls.some(b=>b.stuck)){ctx.fillStyle='#fff';ctx.font='13px sans-serif';ctx.fillText(t('클릭 또는 Space로 발사!','Click or press Space to launch!'),W/2,H-70);}
 }
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 

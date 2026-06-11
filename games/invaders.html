@@ -26,21 +26,21 @@
 <script src="_i18n.js"></script>
 </head>
 <body>
-<div class="topbar"><a href="../index.html">← 메인으로</a><b>🛸 스페이스 인베이더</b><span></span></div>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🛸 스페이스 인베이더</b><span></span></div>
 <div class="stats"><span>⭐ <span id="score">0</span></span><span>❤️ <span id="lives">3</span></span><span>🌊 Wave <span id="wave">1</span></span><span>🏆 <span id="best">0</span></span></div>
 <div id="wrap">
   <canvas id="cv" width="600" height="560"></canvas>
   <div class="overlay" id="startScreen">
-    <h2>스페이스 인베이더</h2>
-    <p class="hint">외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요.</p>
-    <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>←→</kbd> / <kbd>A D</kbd> 이동 · <kbd>Space</kbd> 발사</p>
+    <h2 data-ko="스페이스 인베이더" data-en="Space Invaders">스페이스 인베이더</h2>
+    <p class="hint" data-ko="외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요." data-en="An alien fleet is descending! Shoot them all down and defend Earth. Use the bunkers for cover.">외계 함대가 내려옵니다! 모두 격추하고 지구를 지키세요. 방어막을 활용하세요.</p>
+    <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+    <p class="hint"><kbd>←→</kbd> / <kbd>A D</kbd> <span data-ko="이동" data-en="Move">이동</span> · <kbd>Space</kbd> <span data-ko="발사" data-en="Fire">발사</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
     <p class="hint" id="endStats"></p>
-    <button class="btn" id="restartBtn">🔄 재시작</button>
-    <a class="btn alt" href="../index.html">🏠 홈으로</a>
+    <button class="btn" id="restartBtn" data-ko="🔄 재시작" data-en="🔄 Restart">🔄 재시작</button>
+    <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
   </div>
 </div>
 
@@ -154,8 +154,8 @@ function update(){
 }
 function end(win){
   state='over';
-  document.getElementById('endTitle').textContent=win?'🏆 승리!':'💀 게임 오버';
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`;
+  document.getElementById('endTitle').textContent=win?t('🏆 승리!','🏆 Victory!'):t('💀 게임 오버','💀 Game Over');
+  document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · Wave ${wave}<br>최고: ${best}`,`Score: <b>${score}</b> · Wave ${wave}<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
 }
 
@@ -195,7 +195,7 @@ requestAnimationFrame(loop);
 <script>
 TC.make({
   left:[{label:'◀',key:'ArrowLeft',cls:'big'},{label:'▶',key:'ArrowRight',cls:'big'}],
-  right:[{label:'🔫',sub:'발사',key:' ',cls:'big'}]
+  right:[{label:'🔫',sub:t('발사','Fire'),key:' ',cls:'big'}]
 });
 </script>
 </body>

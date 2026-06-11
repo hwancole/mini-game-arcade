@@ -32,13 +32,13 @@
   <canvas id="cv" width="700" height="460"></canvas>
   <div class="overlay" id="startScreen">
     <h2>핑퐁</h2>
-    <p class="hint">먼저 7점을 내면 승리! 패들을 움직여 공을 받아치세요.</p>
+    <p class="hint" data-ko="먼저 7점을 내면 승리! 패들을 움직여 공을 받아치세요." data-en="First to 7 points wins! Move your paddle to bounce the ball back.">먼저 7점을 내면 승리! 패들을 움직여 공을 받아치세요.</p>
     <div class="modes">
       <div class="mode sel" data-m="ai">🤖 vs AI</div>
       <div class="mode" data-m="2p">👥 2인</div>
     </div>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint">왼쪽: <kbd>W</kbd>/<kbd>S</kbd> 또는 왼쪽 드래그 · 오른쪽: <kbd>↑</kbd>/<kbd>↓</kbd> 또는 오른쪽 드래그</p>
+    <p class="hint"><span data-ko="왼쪽:" data-en="Left:">왼쪽:</span> <kbd>W</kbd>/<kbd>S</kbd> <span data-ko="또는 왼쪽 드래그" data-en="or drag on left">또는 왼쪽 드래그</span> · <span data-ko="오른쪽:" data-en="Right:">오른쪽:</span> <kbd>↑</kbd>/<kbd>↓</kbd> <span data-ko="또는 오른쪽 드래그" data-en="or drag on right">또는 오른쪽 드래그</span></p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -109,7 +109,7 @@ function score(){
   if(sl>=WIN||sr>=WIN){
     state='over';
     const p1=sl>=WIN;
-    document.getElementById('endTitle').textContent=(mode==='ai'?(p1?'🏆 승리!':'🤖 AI 승리'):(p1?'🟢 왼쪽 승리!':'🔵 오른쪽 승리!'));
+    document.getElementById('endTitle').textContent=(mode==='ai'?(p1?t('🏆 승리!','🏆 You Win!'):t('🤖 AI 승리','🤖 AI Wins')):(p1?t('🟢 왼쪽 승리!','🟢 Left Wins!'):t('🔵 오른쪽 승리!','🔵 Right Wins!')));
     endScreen.classList.remove('hidden');
   }
 }
