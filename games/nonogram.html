@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🟦 네모로직</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#10131c;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5f9fff;text-decoration:none;font-weight:bold}
+  h1{margin:4px;color:#5f9fff;font-size:1.4rem}
+  .controls{display:flex;gap:8px;margin:8px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:7px 14px;border:2px solid #555;border-radius:8px;cursor:pointer;color:#eee;background:none;font-weight:bold}
+  .opt.sel{border-color:#5f9fff;background:rgba(95,159,255,.18)}
+  .stats{font-size:1rem;font-weight:bold;margin:4px;display:flex;gap:16px}
+  .puzzle{display:grid;margin:8px;--cs:30px}
+  .corner,.cluecol .cc,.cluerow .rc,.cell{width:var(--cs);height:var(--cs)}
+  .cluecols{display:flex}
+  .cluecol{display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+  .cluecol .cc{display:flex;align-items:center;justify-content:center;font-size:calc(var(--cs)*.42);color:#9bd;font-weight:700}
+  .cluerows{display:flex;flex-direction:column}
+  .cluerow{display:flex;justify-content:flex-end;align-items:center}
+  .cluerow .rc{display:flex;align-items:center;justify-content:center;font-size:calc(var(--cs)*.42);color:#9bd;font-weight:700}
+  .grid{display:grid;background:#33405a;gap:1px;border:2px solid #33405a}
+  .cell{background:#1c2434;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#88a;font-weight:700;font-size:calc(var(--cs)*.5)}
+  .cell.fill{background:#5f9fff}
+  .cell.cross{color:#c66}
+  .cell.b3{box-shadow:inset -2px 0 0 #55617a}.cell.b3r{box-shadow:inset 0 -2px 0 #55617a}
+  .mode-toggle{display:flex;gap:8px;margin:8px}
+  .mt{padding:10px 20px;border:2px solid #555;border-radius:10px;cursor:pointer;font-weight:bold;font-size:1rem}
+  .mt.sel{border-color:#5f9fff;background:rgba(95,159,255,.2)}
+  .btn{background:#5f9fff;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:bold;cursor:pointer;margin:4px}
+  .win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,10,16,.92);gap:14px;z-index:10}
+  .win.hidden{display:none}.win h2{color:#5fffac;font-size:2rem}
+  .hint{font-size:.8rem;color:#778;text-align:center;padding:0 16px;line-height:1.6}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🟦 네모로직</b><span></span></div>
+<h1 data-ko="네모로직" data-en="Nonogram">네모로직</h1>
+<div class="controls">
+  <button class="opt sel" data-n="5">5×5</button>
+  <button class="opt" data-n="10">10×10</button>
+  <button class="opt" id="newBtn2" style="border-color:#5fffac;color:#5fffac" data-ko="새 퍼즐" data-en="New Puzzle">새 퍼즐</button>
+</div>
+<div class="stats"><span>⏱️ <span id="time">0</span>s</span><span>❌ <span id="err">0</span></span></div>
+<div class="puzzle" id="puzzle"></div>
+<div class="mode-toggle">
+  <div class="mt sel" id="mFill" data-ko="🟦 채우기" data-en="🟦 Fill">🟦 채우기</div>
+  <div class="mt" id="mCross" data-ko="❌ 표시" data-en="❌ Mark">❌ 표시</div>
+</div>
+<p class="hint" data-ko="숫자는 그 줄에 연속으로 칠해진 칸 수입니다. 행·열 단서를 모두 만족시키세요. PC는 우클릭으로 X 표시." data-en="Numbers are runs of filled cells in that line. Satisfy all row & column clues. Right-click to mark X on PC.">숫자는 그 줄에 연속으로 칠해진 칸 수입니다. 행·열 단서를 모두 만족시키세요. PC는 우클릭으로 X 표시.</p>
+
+<div class="win hidden" id="winScreen">
+  <h2 data-ko="🎉 완성!" data-en="🎉 Solved!">🎉 완성!</h2>
+  <p id="winStats"></p>
+  <button class="btn" id="winBtn" data-ko="새 퍼즐" data-en="New Puzzle">새 퍼즐</button>
+  <a class="btn alt" href="../index.html" style="background:#3a3a46;color:#fff;text-decoration:none" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+</div>
+
+<script>
+let N=5, sol, cell, rowClues, colClues, fillMode=true, timer=0, timerIv, started, errs;
+const puzzleEl=document.getElementById('puzzle');
+
+document.querySelectorAll('.opt[data-n]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-n]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;newGame();});
+document.getElementById('newBtn2').onclick=newGame;
+document.getElementById('winBtn').onclick=newGame;
+document.getElementById('mFill').onclick=()=>{fillMode=true;document.getElementById('mFill').classList.add('sel');document.getElementById('mCross').classList.remove('sel');};
+document.getElementById('mCross').onclick=()=>{fillMode=false;document.getElementById('mCross').classList.add('sel');document.getElementById('mFill').classList.remove('sel');};
+
+function clues(line){const out=[];let run=0;for(const v of line){if(v){run++;}else if(run){out.push(run);run=0;}}if(run)out.push(run);return out.length?out:[0];}
+function newGame(){
+  // 랜덤 솔루션 생성 (적당한 밀도)
+  do{ sol=Array.from({length:N},()=>Array.from({length:N},()=>Math.random()<0.55?1:0)); }
+  while(sol.flat().every(v=>!v));
+  rowClues=sol.map(r=>clues(r));
+  colClues=[];for(let c=0;c<N;c++)colClues.push(clues(sol.map(r=>r[c])));
+  cell=Array.from({length:N},()=>Array(N).fill(0)); // 0 empty,1 fill,2 cross
+  errs=0;document.getElementById('err').textContent=0;
+  clearInterval(timerIv);timer=0;document.getElementById('time').textContent=0;started=false;
+  document.getElementById('winScreen').classList.add('hidden');
+  buildDOM();
+}
+function buildDOM(){
+  const maxRowClue=Math.max(...rowClues.map(c=>c.length));
+  const maxColClue=Math.max(...colClues.map(c=>c.length));
+  const cs=Math.max(16,Math.min(34,Math.floor((Math.min(window.innerWidth-24,480))/(N+maxRowClue))));
+  puzzleEl.style.setProperty('--cs',cs+'px');
+  puzzleEl.style.gridTemplateColumns=`${maxRowClue*cs}px ${N*cs+ (N-1)+4}px`;
+  puzzleEl.style.gridTemplateRows=`${maxColClue*cs}px auto`;
+  puzzleEl.innerHTML='';
+  // corner
+  const corner=document.createElement('div');corner.className='corner';puzzleEl.appendChild(corner);
+  // column clues
+  const ccwrap=document.createElement('div');ccwrap.className='cluecols';
+  colClues.forEach(cl=>{const col=document.createElement('div');col.className='cluecol';col.style.width=cs+'px';
+    cl.forEach(n=>{const d=document.createElement('div');d.className='cc';d.textContent=n;col.appendChild(d);});ccwrap.appendChild(col);});
+  puzzleEl.appendChild(ccwrap);
+  // row clues
+  const rrwrap=document.createElement('div');rrwrap.className='cluerows';
+  rowClues.forEach(cl=>{const row=document.createElement('div');row.className='cluerow';row.style.height=cs+'px';row.style.width=(maxRowClue*cs)+'px';
+    cl.forEach(n=>{const d=document.createElement('div');d.className='rc';d.textContent=n;row.appendChild(d);});rrwrap.appendChild(row);});
+  puzzleEl.appendChild(rrwrap);
+  // grid
+  const grid=document.createElement('div');grid.className='grid';grid.style.gridTemplateColumns=`repeat(${N},${cs}px)`;
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){const d=document.createElement('div');d.className='cell';d.dataset.r=r;d.dataset.c=c;
+    if((c+1)%5===0&&c<N-1)d.classList.add('b3'); if((r+1)%5===0&&r<N-1)d.classList.add('b3r');
+    d.onclick=()=>tap(r,c,fillMode?1:2);
+    d.oncontextmenu=e=>{e.preventDefault();tap(r,c,2);};
+    grid.appendChild(d);}
+  puzzleEl.appendChild(grid);
+  renderCells();
+}
+function tap(r,c,kind){
+  if(!started){started=true;timerIv=setInterval(()=>{timer++;document.getElementById('time').textContent=timer;},1000);}
+  cell[r][c]=cell[r][c]===kind?0:kind;
+  if(kind===1&&cell[r][c]===1&&!sol[r][c]){errs++;document.getElementById('err').textContent=errs;}
+  renderCells();checkWin();
+}
+function renderCells(){
+  document.querySelectorAll('.cell').forEach(d=>{const r=+d.dataset.r,c=+d.dataset.c,v=cell[r][c];
+    d.classList.toggle('fill',v===1);d.classList.toggle('cross',v===2);d.textContent=v===2?'✕':'';});
+}
+function lineFilled(line){return line.map(v=>v===1?1:0);}
+function checkWin(){
+  for(let r=0;r<N;r++)if(clues(lineFilled(cell[r])).join(',')!==rowClues[r].join(','))return;
+  for(let c=0;c<N;c++)if(clues(lineFilled(cell.map(row=>row[c]))).join(',')!==colClues[c].join(','))return;
+  clearInterval(timerIv);
+  document.getElementById('winStats').textContent=t(`${timer}초 · 실수 ${errs}회`,`${timer}s · ${errs} mistakes`);
+  document.getElementById('winScreen').classList.remove('hidden');
+}
+addEventListener('resize',()=>{if(sol)buildDOM();});
+newGame();
+</script>
+</body>
+</html>

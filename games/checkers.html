@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🔴 체커</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#1a120a;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ff7b6b;text-decoration:none;font-weight:bold}
+  #status{font-size:1.05rem;font-weight:bold;margin:6px;height:24px}
+  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);
+    width:min(94vw,460px);aspect-ratio:1;border:4px solid #4a2f1a;border-radius:4px;touch-action:manipulation}
+  .sq{display:flex;align-items:center;justify-content:center;position:relative;min-width:0;min-height:0}
+  .sq.light{background:#e8c89a}.sq.dark{background:#7a4a28;cursor:pointer}
+  .sq.sel{background:#5fb05f!important}.sq.mv::after{content:'';position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(60,200,60,.6)}
+  .pc{width:74%;height:74%;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;font-size:1rem}
+  .pc.b{background:radial-gradient(circle at 35% 30%,#ff8b7b,#c0392b)}
+  .pc.w{background:radial-gradient(circle at 35% 30%,#fff,#aab)}
+  .pc.king::after{content:'♔';color:rgba(0,0,0,.5);font-size:min(5vw,1.3rem)}
+  .toolbar{display:flex;gap:8px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .btn{background:#ff7b6b;color:#3a1008;border:none;padding:9px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:.9rem}
+  .btn.alt{background:#3a2f22;color:#eee}
+  .record{font-size:.84rem;color:#9aa;margin:4px;text-align:center}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(14,8,4,.93);text-align:center;gap:14px;z-index:10;padding:20px}
+  .overlay.hidden{display:none}.overlay h2{color:#ff7b6b;font-size:1.9rem}
+  .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:9px 16px;border:2px solid #555;border-radius:10px;cursor:pointer;font-weight:bold;color:#eee}
+  .opt.sel{border-color:#ff7b6b;background:rgba(255,123,107,.18)}
+  .hint{font-size:.8rem;color:#778;text-align:center;padding:0 16px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🔴 체커</b><span></span></div>
+<div id="status"></div>
+<div id="board"></div>
+<div class="toolbar">
+  <button class="btn alt" id="newBtn" data-ko="🔄 새 게임" data-en="🔄 New Game">🔄 새 게임</button>
+  <button class="btn alt" id="menuBtn" data-ko="⚙️ 모드 변경" data-en="⚙️ Mode">⚙️ 모드 변경</button>
+</div>
+<div class="record" id="record"></div>
+<p class="hint" data-ko="대각선으로 전진, 상대 말을 뛰어넘어 잡습니다. 잡을 수 있으면 반드시 잡아야 하고 연속 점프도 가능. 끝줄 도달 시 킹(왕관)이 되어 양방향 이동!" data-en="Move diagonally; jump to capture. Captures are mandatory and can chain. Reach the far row to become a King (both directions)!">대각선으로 전진, 상대 말을 뛰어넘어 잡습니다. 잡을 수 있으면 반드시 잡아야 하고 연속 점프도 가능. 끝줄 도달 시 킹(왕관)이 되어 양방향 이동!</p>
+
+<div class="overlay" id="startScreen">
+  <h2>🔴 체커</h2>
+  <div class="opts" id="modeOpts">
+    <div class="opt sel" data-mode="ai" data-ko="🤖 AI 대전" data-en="🤖 vs AI">🤖 AI 대전</div>
+    <div class="opt" data-mode="2p" data-ko="👥 2인 플레이" data-en="👥 2 Players">👥 2인 플레이</div>
+  </div>
+  <div id="diffWrap" class="opts">
+    <div class="opt sel" data-diff="easy" data-ko="쉬움" data-en="Easy">쉬움</div>
+    <div class="opt" data-diff="normal" data-ko="보통" data-en="Normal">보통</div>
+    <div class="opt" data-diff="hard" data-ko="어려움" data-en="Hard">어려움</div>
+  </div>
+  <button class="btn" id="startBtn" style="padding:12px 30px" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <h2 id="endTitle"></h2>
+  <button class="btn" id="againBtn" data-ko="🔄 다시" data-en="🔄 Again">🔄 다시</button>
+  <button class="btn alt" id="endMenuBtn" data-ko="모드 변경" data-en="Mode">모드 변경</button>
+  <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+</div>
+
+<script>
+// 1=흑(아래,플레이어,위로 이동), 2=백(위,AI,아래로 이동), 3=흑킹,4=백킹
+const boardEl=document.getElementById('board'),statusEl=document.getElementById('status');
+const BD=[[-1,-1],[-1,1]], WD=[[1,-1],[1,1]], KD=[[-1,-1],[-1,1],[1,-1],[1,1]];
+let board,turn,mode='ai',diff='easy',state,sel=null,selMoves=[],cells=[],thinking=false;
+
+document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{selOne('#modeOpts',o);mode=o.dataset.mode;document.getElementById('diffWrap').style.display=mode==='ai'?'flex':'none';});
+document.querySelectorAll('#diffWrap .opt').forEach(o=>o.onclick=()=>{selOne('#diffWrap',o);diff=o.dataset.diff;});
+function selOne(s,o){document.querySelectorAll(s+' .opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');}
+document.getElementById('startBtn').onclick=start;document.getElementById('newBtn').onclick=start;document.getElementById('againBtn').onclick=start;
+document.getElementById('menuBtn').onclick=showMenu;document.getElementById('endMenuBtn').onclick=showMenu;
+function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
+
+function start(){
+  board=Array.from({length:8},()=>Array(8).fill(0));
+  for(let r=0;r<3;r++)for(let c=0;c<8;c++)if((r+c)%2===1)board[r][c]=2;
+  for(let r=5;r<8;r++)for(let c=0;c<8;c++)if((r+c)%2===1)board[r][c]=1;
+  turn=1;sel=null;selMoves=[];state='play';thinking=false;
+  document.getElementById('startScreen').classList.add('hidden');document.getElementById('endScreen').classList.add('hidden');
+  buildBoard();render();
+}
+function buildBoard(){boardEl.innerHTML='';cells=[];for(let i=0;i<64;i++){const r=Math.floor(i/8),c=i%8;const d=document.createElement('div');
+  d.className='sq '+((r+c)%2===0?'light':'dark');d.onclick=()=>onCell(r,c);boardEl.appendChild(d);cells.push(d);}}
+
+function inb(r,c){return r>=0&&r<8&&c>=0&&c<8;}
+function sideOf(p){return p===0?0:(p===1||p===3)?1:2;}
+function dirsOf(p){return p>=3?KD:(p===1?BD:WD);}
+
+function captureSeqs(bd,r,c,piece,side){
+  const opp=side===1?2:1, seqs=[];
+  for(const [dr,dc] of dirsOf(piece)){
+    const mr=r+dr,mc=c+dc,lr=r+2*dr,lc=c+2*dc;
+    if(inb(lr,lc)&&bd[lr][lc]===0&&inb(mr,mc)&&sideOf(bd[mr][mc])===opp){
+      const nb=bd.map(x=>[...x]);nb[r][c]=0;nb[mr][mc]=0;nb[lr][lc]=piece;
+      let np=piece,kinged=false;
+      if(piece<3&&((side===1&&lr===0)||(side===2&&lr===7))){np=side===1?3:4;nb[lr][lc]=np;kinged=true;}
+      let ext=false;
+      if(!kinged){const more=captureSeqs(nb,lr,lc,np,side);for(const m of more){seqs.push({sq:[[r,c],...m.sq],caps:[[mr,mc],...m.caps]});ext=true;}}
+      if(!ext)seqs.push({sq:[[r,c],[lr,lc]],caps:[[mr,mc]]});
+    }
+  }
+  return seqs;
+}
+function legalMoves(bd,side){
+  let caps=[],simples=[];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(sideOf(bd[r][c])===side){
+    const cs=captureSeqs(bd,r,c,bd[r][c],side);
+    for(const s of cs)caps.push({from:[r,c],to:s.sq[s.sq.length-1],caps:s.caps});
+    if(!cs.length)for(const [dr,dc] of dirsOf(bd[r][c])){const nr=r+dr,nc=c+dc;if(inb(nr,nc)&&bd[nr][nc]===0)simples.push({from:[r,c],to:[nr,nc],caps:[]});}
+  }
+  return caps.length?caps:simples;
+}
+function applyMove(bd,m){
+  const [fr,fc]=m.from,[tr,tc]=m.to;let p=bd[fr][fc];bd[fr][fc]=0;m.caps.forEach(([cr,cc])=>bd[cr][cc]=0);
+  if(p<3&&((sideOf(p)===1&&tr===0)||(sideOf(p)===2&&tr===7)))p=sideOf(p)===1?3:4;
+  bd[tr][tc]=p;
+}
+
+function onCell(r,c){
+  if(state!=='play'||thinking||(mode==='ai'&&turn!==1))return;
+  const moves=legalMoves(board,turn);
+  if(sel){
+    const m=selMoves.find(mm=>mm.to[0]===r&&mm.to[1]===c);
+    if(m){applyMove(board,m);sel=null;selMoves=[];nextTurn();return;}
+    if(sideOf(board[r][c])===turn){selectPiece(r,c,moves);return;}
+    sel=null;selMoves=[];render();return;
+  }
+  if(sideOf(board[r][c])===turn)selectPiece(r,c,moves);
+}
+function selectPiece(r,c,moves){
+  selMoves=moves.filter(m=>m.from[0]===r&&m.from[1]===c);
+  if(!selMoves.length){sel=null;render();return;} sel=[r,c];render();
+}
+function nextTurn(){
+  turn=3-turn;render();
+  if(!legalMoves(board,turn).length){return endGame(3-turn);} // 둘 수 없으면 패배
+  if(mode==='ai'&&turn===2){thinking=true;render();setTimeout(()=>{const m=aiPick();thinking=false;if(m){applyMove(board,m);nextTurn();}else endGame(1);},120);}
+}
+
+function render(){
+  for(let i=0;i<64;i++){const r=Math.floor(i/8),c=i%8,p=board[r][c],cell=cells[i];
+    cell.className='sq '+((r+c)%2===0?'light':'dark');cell.innerHTML='';
+    if(p){const d=document.createElement('div');d.className='pc '+(sideOf(p)===1?'b':'w')+(p>=3?' king':'');cell.appendChild(d);}
+    if(sel&&sel[0]===r&&sel[1]===c)cell.classList.add('sel');
+    if(selMoves.some(m=>m.to[0]===r&&m.to[1]===c))cell.classList.add('mv');
+  }
+  if(thinking)statusEl.textContent=t('🤖 AI가 생각 중...','🤖 AI thinking...');
+  else{const who=turn===1?t('🔴 흑','🔴 Red'):t('⚪ 백','⚪ White');
+    statusEl.textContent=who+(mode==='ai'?(turn===1?t(' (당신)',' (You)'):' (AI)'):'')+t(' 차례',"'s turn");}
+}
+
+// ---- AI ----
+function evalBoard(bd){let s=0;for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=bd[r][c];if(!p)continue;
+  const val=(p>=3?170:100)+(sideOf(p)===2?(r*4):((7-r)*4)); // 전진 보너스
+  s+=sideOf(p)===2?val:-val;}return s;}
+let deadline=0;
+function minimax(bd,side,depth,alpha,beta){
+  if(performance.now()>deadline)return evalBoard(bd);
+  const moves=legalMoves(bd,side);
+  if(!moves.length)return side===2?-1e7+depth:1e7-depth; // 못 두는 쪽이 짐
+  if(depth===0)return evalBoard(bd);
+  if(side===2){let best=-1e9;for(const m of moves){const nb=bd.map(x=>[...x]);applyMove(nb,m);best=Math.max(best,minimax(nb,1,depth-1,alpha,beta));alpha=Math.max(alpha,best);if(alpha>=beta)break;}return best;}
+  else{let best=1e9;for(const m of moves){const nb=bd.map(x=>[...x]);applyMove(nb,m);best=Math.min(best,minimax(nb,2,depth-1,alpha,beta));beta=Math.min(beta,best);if(alpha>=beta)break;}return best;}
+}
+function aiPick(){
+  const moves=legalMoves(board,2);if(!moves.length)return null;
+  if(diff==='easy'&&Math.random()<0.45)return moves[Math.floor(Math.random()*moves.length)];
+  const depth=diff==='easy'?2:diff==='normal'?4:6;deadline=performance.now()+1200;
+  let best=moves[0],bv=-1e9;
+  for(const m of moves){const nb=board.map(x=>[...x]);applyMove(nb,m);const v=minimax(nb,1,depth-1,-1e9,1e9);if(v>bv){bv=v;best=m;}}
+  return best;
+}
+
+function loadRec(){try{return JSON.parse(localStorage.getItem('checkers_record'))||{};}catch(e){return {};}}
+function showRecord(){const r=loadRec();const f=d=>{const x=r[d]||{w:0,l:0};return t(d==='easy'?'쉬움':d==='normal'?'보통':'어려움',d.charAt(0).toUpperCase()+d.slice(1))+` ${x.w}${t('승','W')} ${x.l}${t('패','L')}`;};
+  document.getElementById('record').textContent=t('📊 AI전 전적','📊 vs AI')+' · '+f('easy')+' · '+f('normal')+' · '+f('hard');}
+function endGame(winner){
+  state='over';let title;
+  if(mode==='ai'){const youWin=winner===1;title=youWin?t('🏆 승리!','🏆 You Win!'):t('😢 패배','😢 You Lose');
+    const r=loadRec();r[diff]=r[diff]||{w:0,l:0};if(youWin)r[diff].w++;else r[diff].l++;localStorage.setItem('checkers_record',JSON.stringify(r));}
+  else title=(winner===1?t('🔴 흑 승리!','🔴 Red wins!'):t('⚪ 백 승리!','⚪ White wins!'));
+  document.getElementById('endTitle').textContent=title;document.getElementById('endScreen').classList.remove('hidden');showRecord();
+}
+showMenu();
+</script>
+</body>
+</html>

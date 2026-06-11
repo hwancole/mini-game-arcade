@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🎨 플러드잇</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#14101c;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#ff9f5f;text-decoration:none;font-weight:bold}
+  h1{margin:4px;color:#ff9f5f;font-size:1.4rem}
+  .controls{display:flex;gap:8px;margin:6px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:7px 14px;border:2px solid #555;border-radius:8px;cursor:pointer;color:#eee;background:none;font-weight:bold}
+  .opt.sel{border-color:#ff9f5f;background:rgba(255,159,95,.18)}
+  .moves{font-size:1.2rem;font-weight:bold;margin:6px}
+  #board{display:grid;gap:0;width:min(92vw,440px);aspect-ratio:1;border-radius:8px;overflow:hidden;touch-action:manipulation}
+  #board div{width:100%;height:100%}
+  .palette{display:flex;gap:10px;margin:14px;flex-wrap:wrap;justify-content:center}
+  .pal{width:54px;height:54px;border-radius:12px;cursor:pointer;border:3px solid rgba(255,255,255,.25);transition:.1s}
+  .pal:active{transform:scale(.9)}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,8,16,.93);gap:14px;z-index:10}
+  .overlay.hidden{display:none}.overlay h2{font-size:2rem}
+  .btn{background:#ff9f5f;color:#3a1d08;border:none;padding:10px 22px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .btn.alt{background:#3a3a46;color:#fff;text-decoration:none}
+  .hint{font-size:.8rem;color:#778;text-align:center;padding:0 16px;line-height:1.6}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🎨 플러드잇</b><span></span></div>
+<h1 data-ko="플러드잇" data-en="Flood It">플러드잇</h1>
+<div class="controls">
+  <button class="opt" data-n="10" data-ko="작게" data-en="Small">작게</button>
+  <button class="opt sel" data-n="14" data-ko="보통" data-en="Normal">보통</button>
+  <button class="opt" data-n="18" data-ko="크게" data-en="Large">크게</button>
+  <button class="opt" id="newBtn" style="border-color:#5fffac;color:#5fffac" data-ko="새 게임" data-en="New Game">새 게임</button>
+</div>
+<div class="moves" data-ko="남은 횟수" data-en="Moves left"></div>
+<div class="moves"><span id="movesLeft">0</span> / <span id="movesMax">0</span></div>
+<div id="board"></div>
+<div class="palette" id="palette"></div>
+<p class="hint" data-ko="좌상단 칸에서 시작해 색을 골라 같은 색 영역을 넓혀가세요. 제한 횟수 안에 보드 전체를 한 색으로!" data-en="Starting from the top-left, pick colors to grow your region. Fill the whole board with one color within the limit!">좌상단 칸에서 시작해 색을 골라 같은 색 영역을 넓혀가세요. 제한 횟수 안에 보드 전체를 한 색으로!</p>
+
+<div class="overlay hidden" id="endScreen">
+  <h2 id="endTitle"></h2>
+  <p id="endSub" style="color:#9aa"></p>
+  <button class="btn" id="againBtn" data-ko="🔄 다시" data-en="🔄 Again">🔄 다시</button>
+  <a class="btn alt" href="../index.html" style="padding:10px 22px;border-radius:8px" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+</div>
+
+<script>
+const COLORS=['#ff5f6d','#ffd35f','#5fffac','#5fd0ff','#c46fff','#ff9f5f'];
+const boardEl=document.getElementById('board');
+let N=14, board, moves, movesMax, state, cells=[];
+
+document.querySelectorAll('.opt[data-n]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-n]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;start();});
+document.getElementById('newBtn').onclick=start;
+document.getElementById('againBtn').onclick=start;
+
+function start(){
+  board=Array.from({length:N},()=>Array.from({length:N},()=>Math.floor(Math.random()*6)));
+  movesMax=Math.round(N*1.7);moves=movesMax;state='play';
+  document.getElementById('movesMax').textContent=movesMax;document.getElementById('movesLeft').textContent=moves;
+  document.getElementById('endScreen').classList.add('hidden');
+  boardEl.style.gridTemplateColumns=`repeat(${N},1fr)`;boardEl.innerHTML='';cells=[];
+  for(let i=0;i<N*N;i++){const d=document.createElement('div');boardEl.appendChild(d);cells.push(d);}
+  // palette
+  const pal=document.getElementById('palette');pal.innerHTML='';
+  COLORS.forEach((c,i)=>{const b=document.createElement('div');b.className='pal';b.style.background=c;b.onclick=()=>pick(i);pal.appendChild(b);});
+  render();
+}
+function render(){for(let r=0;r<N;r++)for(let c=0;c<N;c++)cells[r*N+c].style.background=COLORS[board[r][c]];}
+
+function pick(color){
+  if(state!=='play')return;
+  const old=board[0][0]; if(color===old)return;
+  // BFS flood from (0,0) over old-color region → newColor
+  const st=[[0,0]],seen=new Set(['0,0']);board[0][0]=color;
+  while(st.length){const [r,c]=st.pop();
+    for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const nr=r+dr,nc=c+dc,k=nr+','+nc;
+      if(nr>=0&&nr<N&&nc>=0&&nc<N&&!seen.has(k)&&board[nr][nc]===old){seen.add(k);board[nr][nc]=color;st.push([nr,nc]);}}}
+  moves--;document.getElementById('movesLeft').textContent=moves;render();
+  if(board.every(row=>row.every(v=>v===board[0][0])))return end(true);
+  if(moves<=0)return end(false);
+}
+function end(win){
+  state='over';
+  document.getElementById('endTitle').textContent=win?t('🏆 클리어!','🏆 Cleared!'):t('😢 실패','😢 Failed');
+  document.getElementById('endTitle').style.color=win?'#5fffac':'#ff5f6d';
+  document.getElementById('endSub').textContent=win?t(`${movesMax-moves}번 만에 성공!`,`Done in ${movesMax-moves} moves!`):t('횟수를 모두 사용했어요.','Out of moves.');
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+start();
+</script>
+</body>
+</html>

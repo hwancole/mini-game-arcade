@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>▫️ 점과 상자</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#10141e;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fd0ff;text-decoration:none;font-weight:bold}
+  #status{font-size:1.05rem;font-weight:bold;margin:6px;height:24px}
+  .scores{display:flex;gap:18px;margin:4px;font-size:1.1rem;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:#161c2a;border-radius:8px;display:block;touch-action:manipulation}
+  .toolbar{display:flex;gap:8px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .btn{background:#5fd0ff;color:#063;border:none;padding:9px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:.9rem}
+  .btn.alt{background:#26303e;color:#eee}
+  .record{font-size:.84rem;color:#9aa;margin:4px;text-align:center}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,10,16,.93);text-align:center;gap:14px;z-index:10;padding:20px}
+  .overlay.hidden{display:none}.overlay h2{color:#5fd0ff;font-size:1.9rem}
+  .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:9px 16px;border:2px solid #555;border-radius:10px;cursor:pointer;font-weight:bold;color:#eee}
+  .opt.sel{border-color:#5fd0ff;background:rgba(95,208,255,.18)}
+  .hint{font-size:.8rem;color:#778;text-align:center;padding:0 16px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>▫️ 점과 상자</b><span></span></div>
+<div id="status"></div>
+<div class="scores"><span style="color:#5fd0ff">P1 <span id="s1">0</span></span><span style="color:#ff7b6b"><span id="p2lbl">P2</span> <span id="s2">0</span></span></div>
+<div id="wrap"><canvas id="cv" width="460" height="460"></canvas></div>
+<div class="toolbar">
+  <button class="btn alt" id="newBtn" data-ko="🔄 새 게임" data-en="🔄 New Game">🔄 새 게임</button>
+  <button class="btn alt" id="menuBtn" data-ko="⚙️ 모드 변경" data-en="⚙️ Mode">⚙️ 모드 변경</button>
+</div>
+<div class="record" id="record"></div>
+<p class="hint" data-ko="두 점 사이의 선을 그어 상자를 완성하면 그 칸을 차지하고 한 번 더 둡니다. 더 많은 칸을 차지하면 승리!" data-en="Draw a line between two dots. Complete a box to claim it and move again. Most boxes wins!">두 점 사이의 선을 그어 상자를 완성하면 그 칸을 차지하고 한 번 더 둡니다. 더 많은 칸을 차지하면 승리!</p>
+
+<div class="overlay" id="startScreen">
+  <h2>▫️ 점과 상자</h2>
+  <div class="opts" id="modeOpts">
+    <div class="opt sel" data-mode="ai" data-ko="🤖 AI 대전" data-en="🤖 vs AI">🤖 AI 대전</div>
+    <div class="opt" data-mode="2p" data-ko="👥 2인 플레이" data-en="👥 2 Players">👥 2인 플레이</div>
+  </div>
+  <div class="opts" id="sizeOpts">
+    <div class="opt" data-size="3" data-ko="작게 3×3" data-en="Small 3×3">작게 3×3</div>
+    <div class="opt sel" data-size="5" data-ko="보통 5×5" data-en="Medium 5×5">보통 5×5</div>
+    <div class="opt" data-size="6" data-ko="크게 6×6" data-en="Large 6×6">크게 6×6</div>
+  </div>
+  <button class="btn" id="startBtn" style="padding:12px 30px" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <h2 id="endTitle"></h2>
+  <p id="endSub" style="color:#9aa"></p>
+  <button class="btn" id="againBtn" data-ko="🔄 다시" data-en="🔄 Again">🔄 다시</button>
+  <button class="btn alt" id="endMenuBtn" data-ko="모드 변경" data-en="Mode">모드 변경</button>
+  <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),statusEl=document.getElementById('status');
+let R=5,C=5,PAD=30,GAP,h,v,boxes,turn,mode='ai',state,s1,s2,thinking=false;
+
+document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{selOne('#modeOpts',o);mode=o.dataset.mode;
+  document.getElementById('p2lbl').textContent=mode==='ai'?'AI':'P2';});
+document.querySelectorAll('#sizeOpts .opt').forEach(o=>o.onclick=()=>{selOne('#sizeOpts',o);R=C=+o.dataset.size;});
+function selOne(s,o){document.querySelectorAll(s+' .opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');}
+document.getElementById('startBtn').onclick=start;document.getElementById('newBtn').onclick=start;document.getElementById('againBtn').onclick=start;
+document.getElementById('menuBtn').onclick=showMenu;document.getElementById('endMenuBtn').onclick=showMenu;
+function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
+
+function start(){
+  GAP=(cv.width-PAD*2)/C;
+  h=Array.from({length:R+1},()=>Array(C).fill(0)); // 가로변
+  v=Array.from({length:R},()=>Array(C+1).fill(0)); // 세로변
+  boxes=Array.from({length:R},()=>Array(C).fill(0));
+  turn=1;s1=0;s2=0;state='play';thinking=false;
+  document.getElementById('p2lbl').textContent=mode==='ai'?'AI':'P2';
+  document.getElementById('startScreen').classList.add('hidden');document.getElementById('endScreen').classList.add('hidden');
+  updateScore();draw();
+}
+function px(c){return PAD+c*GAP;}
+function sides(r,c){return h[r][c]+h[r+1][c]+v[r][c]+v[r][c+1];}
+function setEdge(type,r,c,player){ // returns completed count
+  if(type==='h')h[r][c]=1;else v[r][c]=1;
+  let done=0;
+  const check=(br,bc)=>{if(br>=0&&br<R&&bc>=0&&bc<C&&boxes[br][bc]===0&&sides(br,bc)===4){boxes[br][bc]=player;done++;}};
+  if(type==='h'){check(r-1,c);check(r,c);}else{check(r,c-1);check(r,c);}
+  return done;
+}
+function totalEdges(){return (R+1)*C + R*(C+1);}
+function drawnEdges(){let n=0;h.forEach(row=>row.forEach(e=>n+=e));v.forEach(row=>row.forEach(e=>n+=e));return n;}
+
+function move(type,r,c){
+  if((type==='h'?h[r][c]:v[r][c]))return;
+  const done=setEdge(type,r,c,turn);
+  if(done){turn===1?s1+=done:s2+=done;updateScore();}
+  draw();
+  if(drawnEdges()===totalEdges()){return endGame();}
+  if(!done){turn=3-turn;}
+  updateStatus();
+  if(mode==='ai'&&turn===2&&state==='play')aiTurn();
+}
+function aiTurn(){
+  thinking=true;updateStatus();
+  setTimeout(()=>{
+    let guard=0;
+    while(turn===2&&state==='play'&&guard++<200){
+      const mv=aiPick(); if(!mv)break;
+      const done=setEdge(mv.type,mv.r,mv.c,2); if(done)s2+=done;
+      if(drawnEdges()===totalEdges()){thinking=false;updateScore();draw();return endGame();}
+      if(!done){turn=1;break;}
+    }
+    thinking=false;updateScore();draw();updateStatus();
+  },150);
+}
+function allEdges(){const out=[];for(let r=0;r<=R;r++)for(let c=0;c<C;c++)if(!h[r][c])out.push({type:'h',r,c});
+  for(let r=0;r<R;r++)for(let c=0;c<=C;c++)if(!v[r][c])out.push({type:'v',r,c});return out;}
+function edgeCompletes(e){ // 이 변으로 완성되는 박스 수
+  let n=0;const adj=e.type==='h'?[[e.r-1,e.c],[e.r,e.c]]:[[e.r,e.c-1],[e.r,e.c]];
+  for(const [br,bc] of adj)if(br>=0&&br<R&&bc>=0&&bc<C&&sides(br,bc)===3)n++;return n;}
+function edgeMakes3(e){ // 이 변이 3변 박스를 만드는가 (상대에게 줌)
+  if(e.type==='h')h[e.r][e.c]=1;else v[e.r][e.c]=1;
+  let bad=false;const adj=e.type==='h'?[[e.r-1,e.c],[e.r,e.c]]:[[e.r,e.c-1],[e.r,e.c]];
+  for(const [br,bc] of adj)if(br>=0&&br<R&&bc>=0&&bc<C&&sides(br,bc)===3)bad=true;
+  if(e.type==='h')h[e.r][e.c]=0;else v[e.r][e.c]=0;return bad;}
+function aiPick(){
+  const edges=allEdges();if(!edges.length)return null;
+  const completing=edges.filter(e=>edgeCompletes(e)>0);
+  if(completing.length)return completing.sort((a,b)=>edgeCompletes(b)-edgeCompletes(a))[0];
+  const safe=edges.filter(e=>!edgeMakes3(e));
+  if(safe.length)return safe[Math.floor(Math.random()*safe.length)];
+  return edges[Math.floor(Math.random()*edges.length)]; // 어쩔 수 없이 내줌
+}
+
+function updateScore(){document.getElementById('s1').textContent=s1;document.getElementById('s2').textContent=s2;}
+function updateStatus(){
+  if(thinking){statusEl.textContent=t('🤖 AI가 생각 중...','🤖 AI thinking...');return;}
+  const who=turn===1?'🔵 P1':(mode==='ai'?'🔴 AI':'🔴 P2');
+  statusEl.textContent=who+(mode==='ai'&&turn===1?t(' (당신)',' (You)'):'')+t(' 차례',"'s turn");
+}
+
+function nearestEdge(mx,my){
+  let best=null,bd=GAP*0.4;
+  for(let r=0;r<=R;r++)for(let c=0;c<C;c++){const x=px(c)+GAP/2,y=px(r);const d=Math.hypot(mx-x,my-y);if(d<bd&&!h[r][c]){bd=d;best={type:'h',r,c};}}
+  for(let r=0;r<R;r++)for(let c=0;c<=C;c++){const x=px(c),y=px(r)+GAP/2;const d=Math.hypot(mx-x,my-y);if(d<bd&&!v[r][c]){bd=d;best={type:'v',r,c};}}
+  return best;
+}
+function handle(cx,cy){
+  if(state!=='play'||thinking||(mode==='ai'&&turn!==1))return;
+  const r=cv.getBoundingClientRect();const mx=(cx-r.left)*(cv.width/r.width),my=(cy-r.top)*(cv.height/r.height);
+  const e=nearestEdge(mx,my);if(e)move(e.type,e.r,e.c);
+}
+cv.addEventListener('click',e=>handle(e.clientX,e.clientY));
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];handle(t.clientX,t.clientY);},{passive:false});
+
+function draw(){
+  ctx.fillStyle='#161c2a';ctx.fillRect(0,0,cv.width,cv.height);
+  // 박스 색
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(boxes[r][c]){ctx.fillStyle=boxes[r][c]===1?'rgba(95,208,255,.3)':'rgba(255,123,107,.3)';
+    ctx.fillRect(px(c)+3,px(r)+3,GAP-6,GAP-6);
+    ctx.fillStyle=boxes[r][c]===1?'#5fd0ff':'#ff7b6b';ctx.font='bold '+(GAP*0.4)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(boxes[r][c]===1?'1':(mode==='ai'?'AI':'2'),px(c)+GAP/2,px(r)+GAP/2);}
+  // 그어진 변
+  ctx.lineCap='round';
+  for(let r=0;r<=R;r++)for(let c=0;c<C;c++){ctx.strokeStyle=h[r][c]?'#dfe':'rgba(255,255,255,.08)';ctx.lineWidth=h[r][c]?4:2;
+    ctx.beginPath();ctx.moveTo(px(c),px(r));ctx.lineTo(px(c+1),px(r));ctx.stroke();}
+  for(let r=0;r<R;r++)for(let c=0;c<=C;c++){ctx.strokeStyle=v[r][c]?'#dfe':'rgba(255,255,255,.08)';ctx.lineWidth=v[r][c]?4:2;
+    ctx.beginPath();ctx.moveTo(px(c),px(r));ctx.lineTo(px(c),px(r+1));ctx.stroke();}
+  // 점
+  ctx.fillStyle='#fff';for(let r=0;r<=R;r++)for(let c=0;c<=C;c++){ctx.beginPath();ctx.arc(px(c),px(r),4,0,7);ctx.fill();}
+}
+
+function loadRec(){try{return JSON.parse(localStorage.getItem('dots_record'))||{w:0,l:0,d:0};}catch(e){return {w:0,l:0,d:0};}}
+function showRecord(){const r=loadRec();document.getElementById('record').textContent=t('📊 AI전 전적','📊 vs AI')+`: ${r.w}${t('승','W')} ${r.d}${t('무','D')} ${r.l}${t('패','L')}`;}
+function endGame(){
+  state='over';let title;
+  if(s1===s2)title=t('무승부!','Draw!');
+  else if(mode==='ai'){const youWin=s1>s2;title=youWin?t('🏆 승리!','🏆 You Win!'):t('😢 패배','😢 You Lose');
+    const r=loadRec();if(youWin)r.w++;else r.l++;localStorage.setItem('dots_record',JSON.stringify(r));}
+  else title=(s1>s2?'🔵 P1 '+t('승리!','wins!'):'🔴 P2 '+t('승리!','wins!'));
+  document.getElementById('endTitle').textContent=title;
+  document.getElementById('endSub').textContent=`🔵 ${s1}  vs  🔴 ${s2}`;
+  document.getElementById('endScreen').classList.remove('hidden');showRecord();
+}
+showMenu();
+</script>
+</body>
+</html>

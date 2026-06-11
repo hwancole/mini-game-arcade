@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚪ 오델로</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0d1a12;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:560px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fffac;text-decoration:none;font-weight:bold}
+  #status{font-size:1.05rem;font-weight:bold;margin:4px;height:24px}
+  .scores{display:flex;gap:16px;margin:4px;font-size:1.1rem;font-weight:bold}
+  .scores .d{width:18px;height:18px;border-radius:50%;display:inline-block;vertical-align:-3px;margin-right:5px}
+  #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);
+    width:min(94vw,460px);aspect-ratio:1;background:#1d7a44;border:4px solid #114a28;border-radius:6px;gap:2px;padding:2px;touch-action:manipulation}
+  .sq{background:#2a9456;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:2px;min-width:0;min-height:0}
+  .disc{width:82%;height:82%;border-radius:50%;box-shadow:0 2px 3px rgba(0,0,0,.4)}
+  .disc.b{background:radial-gradient(circle at 35% 30%,#555,#000)}
+  .disc.w{background:radial-gradient(circle at 35% 30%,#fff,#bbb)}
+  .hintdot{width:26%;height:26%;border-radius:50%;background:rgba(255,255,255,.4)}
+  .sq.last{box-shadow:inset 0 0 0 3px #ffd35f}
+  .toolbar{display:flex;gap:8px;margin:10px;flex-wrap:wrap;justify-content:center}
+  .btn{background:#5fffac;color:#053;border:none;padding:9px 16px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:.9rem}
+  .btn.alt{background:#26323a;color:#eee}
+  .record{font-size:.84rem;color:#9aa;margin:4px;text-align:center}
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,14,10,.93);text-align:center;gap:14px;z-index:10;padding:20px}
+  .overlay.hidden{display:none}.overlay h2{color:#5fffac;font-size:1.9rem}
+  .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .opt{padding:9px 16px;border:2px solid #555;border-radius:10px;cursor:pointer;font-weight:bold;color:#eee}
+  .opt.sel{border-color:#5fffac;background:rgba(95,255,172,.18)}
+  .hint{font-size:.8rem;color:#778;text-align:center;padding:0 16px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>⚪ 오델로 (리버시)</b><span></span></div>
+<div id="status"></div>
+<div class="scores"><span><span class="d" style="background:#000"></span><span id="sB">2</span></span><span><span class="d" style="background:#fff"></span><span id="sW">2</span></span></div>
+<div id="board"></div>
+<div class="toolbar">
+  <button class="btn alt" id="newBtn" data-ko="🔄 새 게임" data-en="🔄 New Game">🔄 새 게임</button>
+  <button class="btn alt" id="menuBtn" data-ko="⚙️ 모드 변경" data-en="⚙️ Mode">⚙️ 모드 변경</button>
+</div>
+<div class="record" id="record"></div>
+<p class="hint" data-ko="상대 돌을 양끝으로 둘러싸 뒤집으세요. 둘 곳이 없으면 자동 패스. 더 많은 돌을 차지하면 승리!" data-en="Flank the opponent's discs to flip them. Auto-pass when no move. Most discs wins!">상대 돌을 양끝으로 둘러싸 뒤집으세요. 둘 곳이 없으면 자동 패스. 더 많은 돌을 차지하면 승리!</p>
+
+<div class="overlay" id="startScreen">
+  <h2>⚪ 오델로</h2>
+  <div class="opts" id="modeOpts">
+    <div class="opt sel" data-mode="ai" data-ko="🤖 AI 대전" data-en="🤖 vs AI">🤖 AI 대전</div>
+    <div class="opt" data-mode="2p" data-ko="👥 2인 플레이" data-en="👥 2 Players">👥 2인 플레이</div>
+  </div>
+  <div id="diffWrap" class="opts">
+    <div class="opt sel" data-diff="easy" data-ko="쉬움" data-en="Easy">쉬움</div>
+    <div class="opt" data-diff="normal" data-ko="보통" data-en="Normal">보통</div>
+    <div class="opt" data-diff="hard" data-ko="어려움" data-en="Hard">어려움</div>
+  </div>
+  <button class="btn" id="startBtn" style="padding:12px 30px" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <h2 id="endTitle"></h2>
+  <p id="endSub" style="color:#9aa"></p>
+  <button class="btn" id="againBtn" data-ko="🔄 다시" data-en="🔄 Again">🔄 다시</button>
+  <button class="btn alt" id="endMenuBtn" data-ko="모드 변경" data-en="Mode">모드 변경</button>
+  <a class="btn alt" href="../index.html" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+</div>
+
+<script>
+const boardEl=document.getElementById('board'), statusEl=document.getElementById('status');
+const N=8, DIRS=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,1],[-1,-1]];
+const D8=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+// 위치 가중치 (코너 높음, X/C 자리 위험)
+const W=[
+  [120,-20,20,5,5,20,-20,120],[-20,-40,-5,-5,-5,-5,-40,-20],[20,-5,15,3,3,15,-5,20],[5,-5,3,3,3,3,-5,5],
+  [5,-5,3,3,3,3,-5,5],[20,-5,15,3,3,15,-5,20],[-20,-40,-5,-5,-5,-5,-40,-20],[120,-20,20,5,5,20,-20,120]];
+let board, turn, mode='ai', diff='easy', state, lastMove=null, cells=[], thinking=false;
+
+document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{selOne('#modeOpts',o);mode=o.dataset.mode;
+  document.getElementById('diffWrap').style.display=mode==='ai'?'flex':'none';});
+document.querySelectorAll('#diffWrap .opt').forEach(o=>o.onclick=()=>{selOne('#diffWrap',o);diff=o.dataset.diff;});
+function selOne(s,o){document.querySelectorAll(s+' .opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('newBtn').onclick=start;
+document.getElementById('againBtn').onclick=start;
+document.getElementById('menuBtn').onclick=showMenu;
+document.getElementById('endMenuBtn').onclick=showMenu;
+
+function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
+function start(){
+  board=Array.from({length:N},()=>Array(N).fill(0));
+  board[3][3]=2;board[3][4]=1;board[4][3]=1;board[4][4]=2; turn=1; lastMove=null; state='play'; thinking=false;
+  document.getElementById('startScreen').classList.add('hidden');document.getElementById('endScreen').classList.add('hidden');
+  buildBoard();render();maybeAI();
+}
+function buildBoard(){boardEl.innerHTML='';cells=[];for(let i=0;i<64;i++){const d=document.createElement('div');d.className='sq';d.onclick=()=>onCell(i);boardEl.appendChild(d);cells.push(d);}}
+
+function inb(r,c){return r>=0&&r<N&&c>=0&&c<N;}
+function flips(bd,r,c,p){ // 둘 때 뒤집히는 돌 목록
+  if(bd[r][c]!==0)return [];
+  const opp=3-p, out=[];
+  for(const [dr,dc] of D8){let line=[],nr=r+dr,nc=c+dc;
+    while(inb(nr,nc)&&bd[nr][nc]===opp){line.push([nr,nc]);nr+=dr;nc+=dc;}
+    if(line.length&&inb(nr,nc)&&bd[nr][nc]===p)out.push(...line);}
+  return out;
+}
+function validMoves(bd,p){const m=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(bd[r][c]===0&&flips(bd,r,c,p).length)m.push([r,c]);return m;}
+
+function onCell(i){
+  if(state!=='play'||thinking)return;
+  if(mode==='ai'&&turn!==1)return;
+  doMove(Math.floor(i/8),i%8);
+}
+function doMove(r,c){
+  const f=flips(board,r,c,turn); if(!f.length)return;
+  board[r][c]=turn; f.forEach(([fr,fc])=>board[fr][fc]=turn); lastMove=[r,c];
+  nextTurn();
+}
+function nextTurn(){
+  turn=3-turn;
+  if(!validMoves(board,turn).length){ // 패스
+    turn=3-turn;
+    if(!validMoves(board,turn).length){render();return endGame();} // 양쪽 다 못 둠
+  }
+  render();maybeAI();
+}
+function maybeAI(){ if(mode==='ai'&&turn===2&&state==='play'){ thinking=true;render(); setTimeout(()=>{const mv=aiPick();thinking=false;if(mv)doMove(mv[0],mv[1]);else render();},120); } }
+
+function render(){
+  let b=0,w=0;
+  const vm=(state==='play'&&!thinking&&!(mode==='ai'&&turn===2))?validMoves(board,turn):[];
+  for(let i=0;i<64;i++){const r=Math.floor(i/8),c=i%8,v=board[r][c],cell=cells[i];
+    cell.className='sq'+(lastMove&&lastMove[0]===r&&lastMove[1]===c?' last':'');cell.innerHTML='';
+    if(v){const d=document.createElement('div');d.className='disc '+(v===1?'b':'w');cell.appendChild(d);if(v===1)b++;else w++;}
+    else if(vm.some(m=>m[0]===r&&m[1]===c)){const h=document.createElement('div');h.className='hintdot';cell.appendChild(h);}
+  }
+  document.getElementById('sB').textContent=b;document.getElementById('sW').textContent=w;
+  if(thinking)statusEl.textContent=t('🤖 AI가 생각 중...','🤖 AI thinking...');
+  else{const who=turn===1?t('⚫ 흑','⚫ Black'):t('⚪ 백','⚪ White');
+    statusEl.textContent=who+(mode==='ai'?(turn===1?t(' (당신) 차례',' (You)'):t(' (AI) 차례',' (AI)')):t(' 차례',"'s turn"));}
+}
+
+// ---- AI (가중치 평가 + 미니맥스) ----
+function evalBoard(bd){let s=0;for(let r=0;r<N;r++)for(let c=0;c<N;c++){if(bd[r][c]===2)s+=W[r][c];else if(bd[r][c]===1)s-=W[r][c];}
+  // 기동력
+  s+=(validMoves(bd,2).length-validMoves(bd,1).length)*5; return s;}
+function applyMove(bd,r,c,p){const nb=bd.map(x=>[...x]);nb[r][c]=p;flips(bd,r,c,p).forEach(([fr,fc])=>nb[fr][fc]=p);return nb;}
+function minimax(bd,p,depth,alpha,beta){
+  const moves=validMoves(bd,p);
+  if(depth===0)return evalBoard(bd);
+  if(!moves.length){ if(!validMoves(bd,3-p).length)return evalBoard(bd); return minimax(bd,3-p,depth-1,alpha,beta); }
+  if(p===2){let best=-1e9;for(const [r,c] of moves){best=Math.max(best,minimax(applyMove(bd,r,c,p),1,depth-1,alpha,beta));alpha=Math.max(alpha,best);if(alpha>=beta)break;}return best;}
+  else{let best=1e9;for(const [r,c] of moves){best=Math.min(best,minimax(applyMove(bd,r,c,p),2,depth-1,alpha,beta));beta=Math.min(beta,best);if(alpha>=beta)break;}return best;}
+}
+function aiPick(){
+  const moves=validMoves(board,2); if(!moves.length)return null;
+  if(diff==='easy'){ // 약하게: 가중치 1수 + 무작위
+    if(Math.random()<0.4)return moves[Math.floor(Math.random()*moves.length)];
+    let best=moves[0],bv=-1e9;for(const [r,c] of moves){const v=W[r][c];if(v>bv){bv=v;best=[r,c];}}return best;
+  }
+  const depth=diff==='normal'?3:5;
+  let best=moves[0],bv=-1e9;
+  for(const [r,c] of moves){const v=minimax(applyMove(board,r,c,2),1,depth-1,-1e9,1e9);if(v>bv){bv=v;best=[r,c];}}
+  return best;
+}
+
+function loadRec(){try{return JSON.parse(localStorage.getItem('othello_record'))||{};}catch(e){return {};}}
+function showRecord(){const r=loadRec();const f=d=>{const x=r[d]||{w:0,l:0};return (t(d==='easy'?'쉬움':d==='normal'?'보통':'어려움',d.charAt(0).toUpperCase()+d.slice(1)))+` ${x.w}${t('승','W')} ${x.l}${t('패','L')}`;};
+  document.getElementById('record').textContent=t('📊 AI전 전적','📊 vs AI')+' · '+f('easy')+' · '+f('normal')+' · '+f('hard');}
+function endGame(){
+  state='over';let b=0,w=0;board.forEach(row=>row.forEach(v=>{if(v===1)b++;else if(v===2)w++;}));
+  let title;
+  if(b===w)title=t('무승부!','Draw!');
+  else if(mode==='ai'){const youWin=b>w;title=youWin?t('🏆 승리!','🏆 You Win!'):t('😢 패배','😢 You Lose');
+    const r=loadRec();r[diff]=r[diff]||{w:0,l:0};if(youWin)r[diff].w++;else r[diff].l++;localStorage.setItem('othello_record',JSON.stringify(r));}
+  else title=(b>w?t('⚫ 흑 승리!','⚫ Black wins!'):t('⚪ 백 승리!','⚪ White wins!'));
+  document.getElementById('endTitle').textContent=title;
+  document.getElementById('endSub').textContent=`⚫ ${b}  vs  ⚪ ${w}`;
+  document.getElementById('endScreen').classList.remove('hidden');showRecord();
+}
+showMenu();
+</script>
+</body>
+</html>

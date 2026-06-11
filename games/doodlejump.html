@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🟢 도약 점프</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#0e1a14;color:#eee;
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none}
+  .topbar{width:100%;max-width:460px;display:flex;justify-content:space-between;align-items:center;padding:10px 16px}
+  .topbar a{color:#5fffac;text-decoration:none;font-weight:bold}
+  #wrap{position:relative}
+  canvas{background:linear-gradient(180deg,#0e2a1e,#163a28);border:2px solid #2a4a36;border-radius:8px;display:block;touch-action:none}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(6,14,10,.9);border-radius:8px;text-align:center;gap:14px;padding:20px}
+  .overlay.hidden{display:none}.overlay h2{color:#5fffac;font-size:1.9rem}
+  .btn{background:#5fffac;color:#053;border:none;padding:12px 26px;border-radius:8px;font-weight:bold;cursor:pointer}
+  .btn.alt{background:#26323a;color:#fff;text-decoration:none}
+  .hint{color:#9aa;font-size:.85rem;line-height:1.7}
+  kbd{background:#222;border:1px solid #444;border-radius:4px;padding:1px 6px}
+</style>
+<link rel="stylesheet" href="_arcade.css">
+<script src="_i18n.js"></script>
+</head>
+<body>
+<div class="topbar"><a href="../index.html" data-ko="← 메인으로" data-en="← Main">← 메인으로</a><b>🟢 도약 점프</b><span id="hud"></span></div>
+<div id="wrap">
+  <canvas id="cv" width="400" height="600"></canvas>
+  <div class="overlay" id="startScreen">
+    <h2 data-ko="도약 점프" data-en="Doodle Jump">도약 점프</h2>
+    <p class="hint" data-ko="자동으로 통통 튑니다. 좌우로 움직여 발판을 밟고 최대한 높이 올라가세요!" data-en="You bounce automatically. Move left/right to land on platforms and climb as high as you can!">자동으로 통통 튑니다. 좌우로 움직여 발판을 밟고 최대한 높이 올라가세요!</p>
+    <button class="btn" id="startBtn" data-ko="시작 ▶" data-en="Start ▶">시작 ▶</button>
+    <p class="hint"><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> · <span data-ko="화면 좌우 터치/하단 버튼" data-en="tap screen sides / buttons">화면 좌우 터치/하단 버튼</span></p>
+  </div>
+  <div class="overlay hidden" id="endScreen">
+    <h2 data-ko="떨어졌어요!" data-en="You fell!">떨어졌어요!</h2>
+    <p class="hint" id="endStats"></p>
+    <button class="btn" id="restartBtn" data-ko="🔄 재시작" data-en="🔄 Restart">🔄 재시작</button>
+    <a class="btn alt" href="../index.html" style="padding:12px 26px;border-radius:8px" data-ko="🏠 홈으로" data-en="🏠 Home">🏠 홈으로</a>
+  </div>
+</div>
+
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,hud=document.getElementById('hud');
+const GRAV=0.32, JUMP=-11.5, PW=46, PH=46;
+let player, plats, score, best, state, keys={}, touchDir=0;
+best=parseInt(localStorage.getItem('doodle_best')||'0');
+
+function makePlat(y){
+  const type=Math.random()<(score>1500?0.28:0.15)?'move':'normal';
+  const w=64;
+  return {x:Math.random()*(W-w),y,w,type,dir:Math.random()<.5?1:-1,vx:1.4};
+}
+function start(){
+  player={x:W/2-PW/2,y:H-120,vy:0,face:1};
+  plats=[]; for(let i=0;i<9;i++)plats.push(makePlat(H-40-i*70));
+  plats[0].x=W/2-32;plats[0].type='normal';
+  score=0;state='play';
+  document.getElementById('startScreen').classList.add('hidden');document.getElementById('endScreen').classList.add('hidden');
+}
+document.getElementById('startBtn').onclick=start;
+document.getElementById('restartBtn').onclick=start;
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowleft','a','arrowright','d'].includes(k))e.preventDefault();keys[k]=true;});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+cv.addEventListener('touchstart',e=>{e.preventDefault();setTouch(e);},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();setTouch(e);},{passive:false});
+cv.addEventListener('touchend',()=>touchDir=0,{passive:false});
+function setTouch(e){const r=cv.getBoundingClientRect();const x=(e.touches[0].clientX-r.left);touchDir=x<r.width/2?-1:1;}
+
+function update(){
+  let dir=0;
+  if(keys['arrowleft']||keys['a'])dir=-1; if(keys['arrowright']||keys['d'])dir=1; if(touchDir)dir=touchDir;
+  if(dir)player.face=dir;
+  player.x+=dir*6;
+  if(player.x<-PW)player.x=W; if(player.x>W)player.x=-PW; // 화면 좌우 통과
+  player.vy+=GRAV; player.y+=player.vy;
+  // 발판 충돌 (하강 중)
+  if(player.vy>0){
+    for(const p of plats){
+      if(player.x+PW-8>p.x&&player.x+8<p.x+p.w&&player.y+PH>p.y&&player.y+PH<p.y+18){
+        player.vy=JUMP;
+      }
+    }
+  }
+  // 움직이는 발판
+  for(const p of plats)if(p.type==='move'){p.x+=p.dir*p.vx;if(p.x<0||p.x+p.w>W)p.dir*=-1;}
+  // 카메라 스크롤
+  if(player.y<H*0.42){const dy=H*0.42-player.y;player.y=H*0.42;score+=dy;
+    for(const p of plats)p.y+=dy;
+    plats=plats.filter(p=>p.y<H+10);
+    while(plats.length<10){const top=Math.min(...plats.map(p=>p.y));plats.push(makePlat(top-60-Math.random()*40));}
+  }
+  if(player.y>H){return gameOver();}
+  hud.textContent='🏆 '+Math.floor(score/10)+'  ('+t('최고','Best')+' '+Math.floor(best/10)+')';
+}
+function gameOver(){
+  state='over';
+  if(score>best){best=Math.floor(score);localStorage.setItem('doodle_best',best);}
+  document.getElementById('endStats').innerHTML=t(`높이: <b>${Math.floor(score/10)}</b><br>최고: ${Math.floor(best/10)}`,`Height: <b>${Math.floor(score/10)}</b><br>Best: ${Math.floor(best/10)}`);
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+
+function draw(){
+  ctx.fillStyle='#163a28';ctx.fillRect(0,0,W,H);
+  // platforms
+  for(const p of plats){
+    ctx.fillStyle=p.type==='move'?'#5fd0ff':'#7ad17a';
+    roundRect(p.x,p.y,p.w,12,6);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(p.x+3,p.y+2,p.w-6,3);
+  }
+  // player (green creature)
+  const px=player.x,py=player.y;
+  ctx.fillStyle='#5fffac';roundRect(px+6,py+10,PW-12,PH-14,10);ctx.fill();
+  ctx.fillStyle='#5fffac';ctx.beginPath();ctx.ellipse(px+PW/2,py+14,PW/2-6,10,0,0,7);ctx.fill();
+  // eyes
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px+PW/2-6+player.face*4,py+12,5,0,7);ctx.arc(px+PW/2+8+player.face*4,py+12,5,0,7);ctx.fill();
+  ctx.fillStyle='#000';ctx.beginPath();ctx.arc(px+PW/2-6+player.face*6,py+12,2.4,0,7);ctx.arc(px+PW/2+8+player.face*6,py+12,2.4,0,7);ctx.fill();
+  // legs/feet
+  ctx.fillStyle='#3fbf7f';ctx.fillRect(px+10,py+PH-6,8,6);ctx.fillRect(px+PW-18,py+PH-6,8,6);
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function loop(){if(state==='play'){update();}if(player)draw();requestAnimationFrame(loop);}
+ctx.fillStyle='#163a28';ctx.fillRect(0,0,W,H);
+player={x:W/2-PW/2,y:H-120,vy:0,face:1};plats=[];score=0;state='menu';
+requestAnimationFrame(loop);
+</script>
+<script src="_controls.js"></script>
+<script>
+TC.make({ left:[{label:'◀',key:'ArrowLeft',cls:'big'}], right:[{label:'▶',key:'ArrowRight',cls:'big'}] });
+</script>
+</body>
+</html>
