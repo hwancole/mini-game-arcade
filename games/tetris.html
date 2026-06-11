@@ -89,6 +89,25 @@ const SHAPES={
 const KEYS=Object.keys(SHAPES);
 
 let board, cur, nextQueue, bag, hold, canHold, score, lines, level, state, dropTimer, dropInterval, lastT;
+let lockTimer=0, lockResets=0, clearRows=[], clearTimer=0, combo=-1, b2b=false, msg='', msgT=0, flashLevel=0;
+
+// ---- 사운드 (WebAudio) ----
+let actx=null;
+function AC(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(f,f2,dur,type,vol,when){ const a=AC(); if(!a)return; const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square'; o.frequency.setValueAtTime(f,t0); if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.06,t0); g.gain.exponentialRampToValueAtTime(0.0008,t0+dur); o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0+dur); }
+function sfx(type){ switch(type){
+  case 'move': tone(160,160,0.03,'square',0.04); break;
+  case 'rotate': tone(300,380,0.05,'square',0.05); break;
+  case 'lock': tone(130,90,0.06,'square',0.07); break;
+  case 'harddrop': tone(220,70,0.09,'square',0.08); break;
+  case 'hold': tone(440,330,0.06,'square',0.06); break;
+  case 'clear': tone(523,784,0.16,'square',0.1); break;
+  case 'tetris': [523,659,784,1047].forEach((f,i)=>tone(f,f,0.1,'square',0.11,i*0.08)); break;
+  case 'level': tone(659,988,0.2,'square',0.12); break;
+  case 'over': [440,330,247,165].forEach((f,i)=>tone(f,f,0.18,'sawtooth',0.12,i*0.13)); break;
+} }
 
 function newBag(){const b=[...KEYS];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 function nextPiece(){
@@ -124,7 +143,7 @@ function tryRotate(dir){
   for(let i=0;i<(dir>0?1:3);i++)m=rotate(m);
   // wall kicks
   for(const kick of [0,-1,1,-2,2]){
-    if(!collide(cur,kick,0,m)){cur.m=m;cur.x+=kick;return;}
+    if(!collide(cur,kick,0,m)){cur.m=m;cur.x+=kick;sfx('rotate');lockReset();return;}
   }
 }
 function merge(){
@@ -132,33 +151,46 @@ function merge(){
     if(cur.m[r][c]){const y=cur.y+r,x=cur.x+c;if(y>=0)board[y][x]=cur.c;}
   }
 }
-function clearLines(){
-  let cleared=0;
-  for(let r=ROWS-1;r>=0;r--){
-    if(board[r].every(v=>v)){board.splice(r,1);board.unshift(Array(COLS).fill(0));cleared++;r++;}
-  }
-  if(cleared){
-    const pts=[0,100,300,500,800][cleared]*level;
-    score+=pts;lines+=cleared;
-    const newLevel=Math.floor(lines/10)+1;
-    if(newLevel!==level){level=newLevel;dropInterval=Math.max(80,1000-(level-1)*85);}
-    updateUI();
-  }
-}
+function spawnNext(){ dropTimer=0; lockTimer=0; lockResets=0; spawn(); }
 function lockPiece(){
-  merge();clearLines();spawn();dropTimer=0;
+  merge(); sfx('lock');
+  const full=[];
+  for(let r=0;r<ROWS;r++) if(board[r].every(v=>v)) full.push(r);
+  if(full.length){ clearRows=full; clearTimer=200; state='clearing'; }   // 라인 클리어 연출
+  else { combo=-1; spawnNext(); }
+}
+function finishClear(){
+  const n=clearRows.length;
+  clearRows.sort((a,b)=>a-b);
+  for(const r of clearRows){ board.splice(r,1); board.unshift(Array(COLS).fill(0)); }
+  combo++;
+  const isTetris=n===4, usedB2B=isTetris&&b2b;
+  let pts=[0,100,300,500,800][n]*level;
+  if(usedB2B)pts=Math.floor(pts*1.5);
+  if(combo>0)pts+=50*combo*level;        // 콤보 보너스
+  score+=pts; lines+=n; b2b=isTetris;    // 테트리스 연속 = 백투백 유지
+  let m = isTetris?(usedB2B?'B2B TETRIS!':'TETRIS!') : n===3?'TRIPLE!' : n===2?'DOUBLE!' : '';
+  if(combo>0)m+=(m?'  ':'')+'COMBO x'+(combo+1);
+  if(m){msg=m;msgT=60;}
+  sfx(isTetris?'tetris':'clear');
+  const newLevel=Math.floor(lines/10)+1;
+  if(newLevel!==level){level=newLevel;dropInterval=Math.max(80,1000-(level-1)*85);sfx('level');flashLevel=26;msg=t('레벨 업!','LEVEL UP!');msgT=70;}
+  updateUI();
+  clearRows=[]; state='play'; spawnNext();
 }
 function hardDrop(){
-  let d=0;while(!collide(cur,0,d+1))d++;cur.y+=d;score+=d*2;updateUI();lockPiece();
+  let d=0;while(!collide(cur,0,d+1))d++;cur.y+=d;score+=d*2;updateUI();sfx('harddrop');lockPiece();
 }
-function softDrop(){if(!collide(cur,0,1)){cur.y++;score+=1;updateUI();}else lockPiece();dropTimer=0;}
-function move(dx){if(!collide(cur,dx,0))cur.x+=dx;}
+function softDrop(){if(!collide(cur,0,1)){cur.y++;score+=1;updateUI();dropTimer=0;}}
+function lockReset(){ if(collide(cur,0,1)&&lockResets<15){lockTimer=0;lockResets++;} }
+function move(dx){if(!collide(cur,dx,0)){cur.x+=dx;sfx('move');lockReset();}}
 
 function holdPiece(){
-  if(!canHold)return;canHold=false;
+  if(!canHold)return;canHold=false;sfx('hold');
   if(hold){const tmp=hold;hold=cur.type;cur=makePiece(tmp);}
   else{hold=cur.type;cur=nextQueue.shift();nextQueue.push(nextPiece());}
   cur.x=Math.floor((COLS-cur.m[0].length)/2);cur.y=0;
+  dropTimer=0;lockTimer=0;lockResets=0;
   drawHold();
 }
 function makePiece(t){return {type:t,m:SHAPES[t].m.map(r=>[...r]),c:SHAPES[t].c,x:0,y:0};}
@@ -191,6 +223,7 @@ function startGame(){
   board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
   bag=newBag();nextQueue=[nextPiece(),nextPiece(),nextPiece()];
   hold=null;canHold=true;score=0;lines=0;level=1;dropInterval=1000;dropTimer=0;
+  lockTimer=0;lockResets=0;combo=-1;b2b=false;clearRows=[];msg='';msgT=0;flashLevel=0;AC();
   state='play';lastT=performance.now();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -199,7 +232,7 @@ function startGame(){
 }
 function resume(){state='play';document.getElementById('pauseScreen').classList.add('hidden');lastT=performance.now();}
 function gameOver(){
-  state='over';
+  state='over'; sfx('over');
   const key='tetris_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
   document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 라인: ${lines} · 레벨 ${level}`,`Score: <b>${score}</b> · Lines: ${lines} · Level ${level}`)+
@@ -225,7 +258,7 @@ function draw(){
   for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
   // board
   for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c])drawCell(ctx,c,r,board[r][c],CELL);
-  if(cur){
+  if(cur && state!=='clearing'){
     // ghost
     const gy=ghostY();
     for(let r=0;r<cur.m.length;r++)for(let c=0;c<cur.m[r].length;c++)if(cur.m[r][c]){
@@ -235,6 +268,14 @@ function draw(){
     // piece
     for(let r=0;r<cur.m.length;r++)for(let c=0;c<cur.m[r].length;c++)if(cur.m[r][c])drawCell(ctx,cur.x+c,cur.y+r,cur.c,CELL);
   }
+  // 라인 클리어 깜빡임
+  if(state==='clearing'){ const on=Math.floor(clearTimer/50)%2===0;
+    for(const r of clearRows){ ctx.fillStyle=on?'rgba(255,255,255,.92)':'rgba(120,200,255,.5)'; ctx.fillRect(0,r*CELL,COLS*CELL,CELL); } }
+  // 콤보/테트리스 메시지
+  if(msgT>0&&msg){ ctx.save();ctx.globalAlpha=Math.min(1,msgT/25);ctx.fillStyle='#ffd35f';ctx.font='bold 20px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.strokeText(msg,cv.width/2,cv.height*0.42);ctx.fillText(msg,cv.width/2,cv.height*0.42);ctx.restore(); }
+  // 레벨업 플래시
+  if(flashLevel>0){ ctx.fillStyle=`rgba(95,208,255,${flashLevel/26*0.22})`; ctx.fillRect(0,0,cv.width,cv.height); }
 }
 function drawMini(g,canvas,type){
   g.clearRect(0,0,canvas.width,canvas.height);
@@ -264,11 +305,23 @@ function drawNext(){
 function drawHold(){drawMini(hctx,holdCv,hold);}
 
 function loop(t){
+  const dt=Math.min(100,t-lastT); lastT=t;
   if(state==='play'){
-    const dt=t-lastT;lastT=t;dropTimer+=dt;
-    if(dropTimer>=dropInterval){if(!collide(cur,0,1)){cur.y++;}else{lockPiece();}dropTimer=0;}
+    dropTimer+=dt;
+    if(!collide(cur,0,1)){                       // 떨어질 수 있으면
+      if(dropTimer>=dropInterval){cur.y++;dropTimer=0;}
+      lockTimer=0; lockResets=0;
+    } else {                                       // 착지: 록 딜레이 동안 조작 가능
+      lockTimer+=dt;
+      if(lockTimer>=480||lockResets>=15) lockPiece();
+    }
+    if(msgT>0)msgT--; if(flashLevel>0)flashLevel--;
     draw();drawNext();
-  } else {lastT=t;}
+  } else if(state==='clearing'){
+    clearTimer-=dt; if(msgT>0)msgT--; if(flashLevel>0)flashLevel--;
+    draw();
+    if(clearTimer<=0) finishClear();
+  }
   requestAnimationFrame(loop);
 }
 // idle bg
