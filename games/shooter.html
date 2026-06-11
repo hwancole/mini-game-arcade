@@ -38,7 +38,7 @@
 
   <div class="overlay" id="startScreen">
     <h2 data-ko="탑다운 슈팅" data-en="Top-Down Shooter">탑다운 슈팅</h2>
-    <p class="hint" data-ko="모드를 선택하고 시작하세요." data-en="Pick a mode and start.">모드를 선택하고 시작하세요.</p>
+    <p class="hint" data-ko="적이 떨어뜨리는 무기(🔵SMG·🟣샷건)와 체력·탄약을 주우세요! 적은 일반·빠른·거대 3종." data-en="Grab weapons (🔵SMG·🟣Shotgun), health & ammo dropped by enemies! 3 enemy types: grunt, runner, brute.">적이 떨어뜨리는 무기(🔵SMG·🟣샷건)와 체력·탄약을 주우세요! 적은 일반·빠른·거대 3종.</p>
     <div class="modes">
       <div class="mode sel" data-mode="deathmatch"><h3 data-ko="💀 데스매치" data-en="💀 Deathmatch">💀 데스매치</h3><p data-ko="적 4명을 모두 처치하면 승리" data-en="Eliminate all 4 enemies to win">적 4명을 모두 처치하면 승리</p></div>
       <div class="mode" data-mode="infinite"><h3 data-ko="♾️ 무한모드" data-en="♾️ Endless">♾️ 무한모드</h3><p data-ko="끝없이 몰려오는 적, 최고 킬 도전" data-en="Endless waves of enemies — chase the high kill count">끝없이 몰려오는 적, 최고 킬 도전</p></div>
@@ -91,6 +91,48 @@ const walls=[
 let keys={}, mouse={x:W/2,y:H/2,down:false};
 let player, enemies, bullets, particles, pickups;
 let state='menu', kills=0, wave=0, lastTime=0, spawnTimer=0;
+let shake=0, hurt=0;
+function addShake(n){ shake=Math.min(16,shake+n); }
+
+// ---- 사운드 (WebAudio, 사용자 제스처 후 활성화) ----
+let actx=null;
+function AC(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(f,f2,dur,type,vol){ const a=AC(); if(!a)return; const o=a.createOscillator(),g=a.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,a.currentTime);
+  if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),a.currentTime+dur);
+  g.gain.setValueAtTime(vol||0.14,a.currentTime); g.gain.exponentialRampToValueAtTime(0.0008,a.currentTime+dur);
+  o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur); }
+function noise(dur,vol){ const a=AC(); if(!a)return; const n=a.sampleRate*dur|0; const buf=a.createBuffer(1,n,a.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
+  const s=a.createBufferSource(); s.buffer=buf; const g=a.createGain(); g.gain.value=vol||0.18; s.connect(g); g.connect(a.destination); s.start(); }
+function sfx(type){ switch(type){
+  case 'pistol': tone(230,80,0.08,'square',0.12); noise(0.05,0.07); break;
+  case 'smg': tone(320,150,0.05,'square',0.09); break;
+  case 'shotgun': tone(150,45,0.16,'sawtooth',0.16); noise(0.15,0.18); break;
+  case 'reload': tone(520,520,0.04,'square',0.08); setTimeout(()=>tone(360,360,0.05,'square',0.08),130); break;
+  case 'hit': tone(880,560,0.05,'square',0.06); break;
+  case 'death': tone(170,40,0.24,'sawtooth',0.15); noise(0.2,0.16); break;
+  case 'pickup': tone(520,800,0.10,'triangle',0.12); break;
+  case 'hurt': tone(120,45,0.18,'sawtooth',0.18); noise(0.1,0.12); break;
+} }
+
+// ---- 무기 (권총/SMG/샷건) ----
+const WEAPONS={
+  pistol:{name:['권총','Pistol'],mag:14,reserve:70,cool:11,dmg:15,pellets:1,spread:0.05,reload:65,bspeed:12,shake:2},
+  smg:{name:['기관단총','SMG'],mag:30,reserve:150,cool:5,dmg:9,pellets:1,spread:0.10,reload:80,bspeed:13,shake:1.5},
+  shotgun:{name:['샷건','Shotgun'],mag:6,reserve:30,cool:34,dmg:9,pellets:6,spread:0.34,reload:95,bspeed:11,shake:6},
+};
+// ---- 적 타입 (일반/快足/거대) ----
+const ETYPES={
+  grunt:{r:13,hp:30,speed:1.45,fireRate:62,dmg:8,color:'#ff7b7b',bspeed:6},
+  runner:{r:10,hp:18,speed:2.6,fireRate:48,dmg:6,color:'#ffd35f',bspeed:7},
+  brute:{r:19,hp:75,speed:0.9,fireRate:115,dmg:16,color:'#c46fff',bspeed:5},
+};
+function pickType(){ const w=wave||1, r=Math.random();
+  if(mode==='deathmatch') return r<0.5?'grunt':r<0.8?'runner':'brute';
+  if(w<2) return r<0.85?'grunt':'runner';
+  if(w<4) return r<0.55?'grunt':r<0.85?'runner':'brute';
+  return r<0.4?'grunt':r<0.72?'runner':'brute'; }
 
 function rectCircle(rx,ry,rw,rh,cx,cy,cr){
   const nx=Math.max(rx,Math.min(cx,rx+rw)), ny=Math.max(ry,Math.min(cy,ry+rh));
@@ -122,22 +164,22 @@ function spawnPoint(){
   return {x,y};
 }
 
-function makeEnemy(){
-  const p=spawnPoint();
-  return {x:p.x,y:p.y,r:13,hp:30,maxhp:30,speed:1.3+Math.random()*0.5,angle:0,cool:0,
-          fireRate:60+Math.random()*40,color:'#ff7b7b',hitFlash:0,
+function makeEnemy(typeKey){
+  const p=spawnPoint(), tk=typeKey||pickType(), T=ETYPES[tk];
+  return {x:p.x,y:p.y,type:tk,r:T.r,hp:T.hp,maxhp:T.hp,speed:T.speed+Math.random()*0.3,angle:0,cool:Math.random()*40,
+          fireRate:T.fireRate+Math.random()*30,dmg:T.dmg,bspeed:T.bspeed,color:T.color,hitFlash:0,
           strafe:Math.random()<0.5?1:-1,strafeTimer:0,
           lastSeen:null,wander:{x:p.x,y:p.y},wanderTimer:0};
 }
 
 function startGame(){
   player={x:W/2,y:H-80,r:14,angle:0,speed:2.4,hp:100,maxhp:100,
-          ammo:30,mag:30,reserve:90,reloading:0,fireCool:0,muzzle:0};
+          weapon:'pistol',ammo:WEAPONS.pistol.mag,reserve:WEAPONS.pistol.reserve,reloading:0,fireCool:0,muzzle:0};
   enemies=[]; bullets=[]; particles=[]; pickups=[];
-  kills=0; wave=0; spawnTimer=0;
-  if(mode==='deathmatch'){ for(let i=0;i<4;i++) enemies.push(makeEnemy()); }
-  else { for(let i=0;i<3;i++) enemies.push(makeEnemy()); }
-  state='play';
+  kills=0; wave=1; spawnTimer=0; shake=0; hurt=0;
+  if(mode==='deathmatch'){ ['grunt','grunt','runner','brute'].forEach(tk=>enemies.push(makeEnemy(tk))); }
+  else { for(let i=0;i<3;i++) enemies.push(makeEnemy('grunt')); }
+  state='play'; AC();
   startScreen.classList.add('hidden'); endScreen.classList.add('hidden'); pauseScreen.classList.add('hidden');
   modeLabel.textContent = mode==='deathmatch'?t('💀 데스매치','💀 Deathmatch'):t('♾️ 무한모드','♾️ Endless');
   lastTime=performance.now();
@@ -158,17 +200,22 @@ function endGame(win){
 }
 
 function shoot(){
-  if(player.reloading>0 || player.ammo<=0 || player.fireCool>0) return;
-  player.ammo--; player.fireCool=8; player.muzzle=3;
-  const ang=player.angle+(Math.random()-.5)*0.06;
-  bullets.push({x:player.x+Math.cos(ang)*18,y:player.y+Math.sin(ang)*18,
-    vx:Math.cos(ang)*11,vy:Math.sin(ang)*11,r:3,from:'p',life:80});
-  // recoil
-  player.x-=Math.cos(ang)*1.5; player.y-=Math.sin(ang)*1.5;
+  if(player.reloading>0 || player.fireCool>0) return;
+  const Wp=WEAPONS[player.weapon];
+  if(player.ammo<=0){ reload(); return; } // 탄창 비면 자동 재장전
+  player.ammo--; player.fireCool=Wp.cool; player.muzzle=4;
+  for(let i=0;i<Wp.pellets;i++){
+    const ang=player.angle+(Math.random()-.5)*Wp.spread;
+    bullets.push({x:player.x+Math.cos(ang)*18,y:player.y+Math.sin(ang)*18,
+      vx:Math.cos(ang)*Wp.bspeed,vy:Math.sin(ang)*Wp.bspeed,r:3,from:'p',life:70,dmg:Wp.dmg});
+  }
+  player.x-=Math.cos(player.angle)*1.5; player.y-=Math.sin(player.angle)*1.5;
+  addShake(Wp.shake); sfx(player.weapon);
 }
 function reload(){
-  if(player.reloading>0||player.ammo===player.mag||player.reserve<=0) return;
-  player.reloading=90;
+  const Wp=WEAPONS[player.weapon];
+  if(player.reloading>0||player.ammo===Wp.mag||player.reserve<=0) return;
+  player.reloading=Wp.reload; sfx('reload');
 }
 
 // input
@@ -206,9 +253,10 @@ function update(dt){
   if(player.fireCool>0)player.fireCool--;
   if(player.muzzle>0)player.muzzle--;
   if(player.reloading>0){player.reloading--; if(player.reloading===0){
-    const need=player.mag-player.ammo, take=Math.min(need,player.reserve);
+    const need=WEAPONS[player.weapon].mag-player.ammo, take=Math.min(need,player.reserve);
     player.ammo+=take; player.reserve-=take;
   }}
+  if(hurt>0)hurt--;
   if(mouse.down) shoot();
 
   // enemies AI
@@ -255,7 +303,7 @@ function update(dt){
     if(sees && e.cool<=0 && dist<440){
       e.cool=e.fireRate;
       const a=e.angle+(Math.random()-.5)*0.18;
-      bullets.push({x:e.x+Math.cos(a)*16,y:e.y+Math.sin(a)*16,vx:Math.cos(a)*6,vy:Math.sin(a)*6,r:3,from:'e',life:120});
+      bullets.push({x:e.x+Math.cos(a)*16,y:e.y+Math.sin(a)*16,vx:Math.cos(a)*e.bspeed,vy:Math.sin(a)*e.bspeed,r:3,from:'e',life:120,dmg:e.dmg});
     }
   }
 
@@ -265,10 +313,10 @@ function update(dt){
     for(const w of walls) if(b.x>w.x&&b.x<w.x+w.w&&b.y>w.y&&b.y<w.y+w.h){b.life=0;spark(b.x,b.y,'#888',4,3);}
     if(b.from==='p'){
       for(const e of enemies){
-        if(Math.hypot(b.x-e.x,b.y-e.y)<e.r+b.r){ e.hp-=12; e.hitFlash=4; b.life=0; spark(b.x,b.y,'#ff9b9b',6,4); }
+        if(Math.hypot(b.x-e.x,b.y-e.y)<e.r+b.r){ e.hp-=b.dmg; e.hitFlash=4; b.life=0; spark(b.x,b.y,'#ff9b9b',6,4); sfx('hit'); }
       }
     } else {
-      if(Math.hypot(b.x-player.x,b.y-player.y)<player.r+b.r){ player.hp-=8; b.life=0; spark(b.x,b.y,'#ffd27b',6,4); }
+      if(Math.hypot(b.x-player.x,b.y-player.y)<player.r+b.r){ player.hp-=b.dmg; b.life=0; spark(b.x,b.y,'#ffd27b',6,4); hurt=14; addShake(3); sfx('hurt'); }
     }
   }
   bullets=bullets.filter(b=>b.life>0);
@@ -276,8 +324,12 @@ function update(dt){
   // enemy death
   for(let i=enemies.length-1;i>=0;i--){
     if(enemies[i].hp<=0){
-      spark(enemies[i].x,enemies[i].y,'#ff5f6d',24,6);
-      if(Math.random()<0.4) pickups.push({x:enemies[i].x,y:enemies[i].y,r:9,type:Math.random()<0.5?'hp':'ammo',t:0});
+      const e=enemies[i];
+      spark(e.x,e.y,e.color,e.type==='brute'?34:24,7); addShake(e.type==='brute'?6:3); sfx('death');
+      const r=Math.random(); let drop=null;
+      if(e.type==='brute') drop = r<0.4?'shotgun':r<0.7?'smg':r<0.9?'hp':'ammo';
+      else drop = r<0.28?'hp':r<0.52?'ammo':r<0.62?'smg':r<0.68?'shotgun':null;
+      if(drop) pickups.push({x:e.x,y:e.y,r:10,type:drop,t:0});
       enemies.splice(i,1); kills++;
     }
   }
@@ -287,8 +339,9 @@ function update(dt){
     const p=pickups[i]; p.t++;
     if(Math.hypot(p.x-player.x,p.y-player.y)<player.r+p.r){
       if(p.type==='hp')player.hp=Math.min(player.maxhp,player.hp+25);
-      else player.reserve+=30;
-      spark(p.x,p.y,p.type==='hp'?'#5fffbc':'#ffc371',10,4); pickups.splice(i,1);
+      else if(p.type==='ammo')player.reserve+=Math.round(WEAPONS[player.weapon].reserve*0.4)+10;
+      else { player.weapon=p.type; const Wp=WEAPONS[p.type]; player.ammo=Wp.mag; player.reserve=Wp.reserve; player.reloading=0; }
+      sfx('pickup'); spark(p.x,p.y,'#fff',12,4); pickups.splice(i,1);
     }
   }
 
@@ -308,10 +361,13 @@ function update(dt){
   if(player.hp<=0){player.hp=0; endGame(false);}
 }
 
+const PICK={hp:{c:'#5fffbc',l:'+'},ammo:{c:'#ffc371',l:'A'},smg:{c:'#5fd0ff',l:'S'},shotgun:{c:'#ff5fd0',l:'G'}};
 function draw(){
   ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#1a1a24'; ctx.fillRect(0,0,W,H); // 같은 색이라 흔들림 시 가장자리 빈틈 안 보임
+  ctx.save();
+  if(shake>0.3){ ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake); shake*=0.86; } else shake=0;
   // floor grid
-  ctx.fillStyle='#1a1a24'; ctx.fillRect(0,0,W,H);
   ctx.strokeStyle='rgba(255,255,255,.03)';
   for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
@@ -322,11 +378,11 @@ function draw(){
   }
   // pickups
   for(const p of pickups){
+    const pk=PICK[p.type]||PICK.ammo;
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.t*0.04);
-    ctx.fillStyle=p.type==='hp'?'#5fffbc':'#ffc371';
-    ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2);
-    ctx.fillStyle='#0d0d14';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(p.type==='hp'?'+':'A',0,1);ctx.restore();
+    ctx.shadowColor=pk.c;ctx.shadowBlur=8;ctx.fillStyle=pk.c;ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2);ctx.shadowBlur=0;
+    ctx.fillStyle='#0d0d14';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(pk.l,0,1);ctx.restore();
   }
   // particles
   for(const p of particles){ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.fillRect(p.x-p.r,p.y-p.r,p.r*2,p.r*2);}
@@ -342,8 +398,15 @@ function draw(){
   drawActor(player,'#5f9fff',false);
   if(player.muzzle>0){
     ctx.fillStyle='rgba(255,240,120,.9)';
-    ctx.beginPath();ctx.arc(player.x+Math.cos(player.angle)*22,player.y+Math.sin(player.angle)*22,6,0,7);ctx.fill();
+    const ms=player.weapon==='shotgun'?10:6;
+    ctx.beginPath();ctx.arc(player.x+Math.cos(player.angle)*22,player.y+Math.sin(player.angle)*22,ms,0,7);ctx.fill();
   }
+  ctx.restore();
+  // 피격 빨강 비네트
+  if(hurt>0){ const a=Math.min(0.5,hurt/14*0.5);
+    const g=ctx.createRadialGradient(W/2,H/2,H*0.28,W/2,H/2,H*0.78);
+    g.addColorStop(0,'rgba(255,0,0,0)');g.addColorStop(1,`rgba(255,30,30,${a})`);
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H); }
   drawHUD();
 }
 function drawActor(a,color,isEnemy){
@@ -355,8 +418,9 @@ function drawActor(a,color,isEnemy){
   ctx.restore();
   // hp bar for enemies
   if(isEnemy){
-    ctx.fillStyle='#000';ctx.fillRect(a.x-15,a.y-a.r-10,30,4);
-    ctx.fillStyle='#ff5f6d';ctx.fillRect(a.x-15,a.y-a.r-10,30*(a.hp/30),4);
+    const bw=a.r*2+4;
+    ctx.fillStyle='#000';ctx.fillRect(a.x-bw/2,a.y-a.r-10,bw,4);
+    ctx.fillStyle='#ff5f6d';ctx.fillRect(a.x-bw/2,a.y-a.r-10,bw*Math.max(0,a.hp/a.maxhp),4);
   }
 }
 function drawHUD(){
@@ -366,8 +430,11 @@ function drawHUD(){
   ctx.fillStyle='#5fffbc';ctx.fillRect(20,H-40,180*(player.hp/player.maxhp),12);
   ctx.fillStyle='#fff';ctx.font='12px sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
   ctx.fillText('HP '+Math.ceil(player.hp),20,H-44);
-  // ammo
-  ctx.font='bold 20px sans-serif';ctx.textAlign='right';
+  // weapon name + ammo
+  const Wp=WEAPONS[player.weapon];
+  ctx.font='bold 13px sans-serif';ctx.textAlign='right';ctx.fillStyle='#ffd35f';
+  ctx.fillText('🔫 '+t(Wp.name[0],Wp.name[1]),W-20,H-46);
+  ctx.font='bold 20px sans-serif';
   ctx.fillStyle=player.reloading>0?'#ffc371':'#fff';
   const ammoTxt=player.reloading>0?t('재장전...','Reloading...'):`${player.ammo} / ${player.reserve}`;
   ctx.fillText(ammoTxt,W-20,H-22);
