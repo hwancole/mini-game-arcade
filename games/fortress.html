@@ -39,10 +39,15 @@
   <canvas id="cv" width="900" height="500"></canvas>
   <div class="overlay" id="startScreen">
     <h2 data-ko="포트리스 포격전" data-en="Artillery Duel">포트리스 포격전</h2>
-    <p class="hint" data-ko="각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다." data-en="Adjust angle and power to hit the enemy tank. Wind affects your shot and the terrain gets destroyed.">각도와 파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다.</p>
-    <div class="modes">
+    <p class="hint" data-ko="각도·파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다. 무기 3종(일반·대형·집중)을 Shift로 전환!" data-en="Adjust angle and power to hit the enemy tank. Wind affects your shot and terrain is destroyed. Switch between 3 weapons (Normal/Big/Focused) with Shift!">각도·파워를 조절해 상대 탱크를 맞추세요. 바람의 영향을 받고 지형이 파괴됩니다. 무기 3종(일반·대형·집중)을 Shift로 전환!</p>
+    <div class="modes" id="modeRow">
       <div class="mode sel" data-mode="ai"><b data-ko="🤖 vs AI" data-en="🤖 vs AI">🤖 vs AI</b></div>
-      <div class="mode" data-mode="2p"><b data-ko="👥 2인 대전" data-en="👥 2 Players">👥 2인 대전</b></div>
+      <div class="mode" data-mode="2p"><b data-ko="👥 2인 대전" data-en="👥 2 Players">👥 2 Players</b></div>
+    </div>
+    <div class="modes" id="diffRow" style="gap:8px">
+      <div class="mode" data-diff="easy"><b data-ko="쉬움" data-en="Easy">쉬움</b></div>
+      <div class="mode sel" data-diff="normal"><b data-ko="보통" data-en="Normal">보통</b></div>
+      <div class="mode" data-diff="hard"><b data-ko="어려움" data-en="Hard">어려움</b></div>
     </div>
     <button class="btn" id="startBtn" data-ko="전투 시작 ▶" data-en="Start Battle ▶">전투 시작 ▶</button>
     <p class="hint"><kbd>←</kbd><kbd>→</kbd> <span data-ko="각도 ·" data-en="angle ·">각도 ·</span> <kbd>↑</kbd><kbd>↓</kbd> <span data-ko="파워 ·" data-en="power ·">파워 ·</span> <kbd>Space</kbd> <span data-ko="발사" data-en="fire">발사</span></p>
@@ -59,6 +64,7 @@
   <div class="ctl"><span data-ko="각도" data-en="Angle">각도</span><b id="angV">45°</b></div>
   <div class="ctl"><span data-ko="파워" data-en="Power">파워</span><b id="powV">50</b></div>
   <div class="ctl"><span data-ko="바람" data-en="Wind">바람</span><b id="windV">→ 0</b></div>
+  <div class="ctl"><span data-ko="무기(Shift)" data-en="Weapon(Shift)">무기(Shift)</span><b id="weapV" style="cursor:pointer">●</b></div>
   <button id="fireBtn" data-ko="발사 🔥" data-en="Fire 🔥">발사 🔥</button>
 </div>
 
@@ -67,10 +73,37 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.h
 const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
 const turnLabel=document.getElementById('turnLabel');
 let mode='ai';
-document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.mode;});
+document.querySelectorAll('#modeRow .mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('#modeRow .mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.mode;document.getElementById('diffRow').style.display=mode==='ai'?'flex':'none';});
+document.querySelectorAll('#diffRow .mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('#diffRow .mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');diff=m.dataset.diff;});
 
 let terrain=new Float32Array(W); // height of ground at each x
 let tanks, turn, wind, state='menu', proj=null, particles=[], aiTimer=0, aiThinking=false;
+let shake=0, pops=[], windStreaks=[], diff='normal';
+function addShake(n){shake=Math.min(22,shake+n);}
+function popText(x,y,txt,col){pops.push({x,y,txt,col:col||'#fff',life:48});}
+const WEAPONS={
+  normal:{ko:'일반탄',en:'Normal',r:34,dmg:1},
+  big:{ko:'대형탄',en:'Big Shell',r:58,dmg:1.5},
+  focus:{ko:'집중탄',en:'Focused',r:22,dmg:2.3},
+};
+const WORDER=['normal','big','focus'];
+
+// ---- 사운드 (WebAudio) ----
+let acx=null;
+function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,dur,type,vol,when){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.08,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+dur);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+dur);}
+function noise(dur,vol){const a=AC();if(!a)return;const n=a.sampleRate*dur|0,buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=a.createBufferSource();s.buffer=buf;const g=a.createGain();g.gain.value=vol||0.12;s.connect(g);g.connect(a.destination);s.start();}
+function sfx(type){switch(type){
+  case 'fire': tone(320,130,0.18,'sawtooth',0.1); noise(0.1,0.08); break;
+  case 'explode': tone(130,40,0.35,'square',0.15); noise(0.3,0.18); break;
+  case 'hit': tone(420,70,0.3,'sawtooth',0.14); noise(0.2,0.12); break;
+  case 'turn': tone(440,660,0.1,'square',0.07); break;
+  case 'win': [523,659,784,1047].forEach((f,i)=>tone(f,f,0.15,'square',0.11,i*0.12)); break;
+  case 'click': tone(520,520,0.04,'square',0.05); break;
+}}
 
 function genTerrain(){
   let h=300+Math.random()*40;
@@ -87,14 +120,15 @@ function groundY(x){x=Math.max(0,Math.min(W-1,Math.round(x)));return terrain[x];
 function initTanks(){
   const x1=80+Math.random()*60, x2=W-140-Math.random()*60;
   tanks=[
-    {x:x1,color:'#5f9fff',name:t('플레이어 1','Player 1'),hp:100,angle:45,power:50,aim:1},
-    {x:x2,color:'#ff5f6d',name:mode==='ai'?'AI':t('플레이어 2','Player 2'),hp:100,angle:135,power:50,aim:-1},
+    {x:x1,color:'#5f9fff',name:t('플레이어 1','Player 1'),hp:100,angle:45,power:50,aim:1,weapon:'normal',flash:0},
+    {x:x2,color:'#ff5f6d',name:mode==='ai'?'AI':t('플레이어 2','Player 2'),hp:100,angle:135,power:50,aim:-1,weapon:'normal',flash:0},
   ];
 }
 function newWind(){wind=(Math.random()*2-1)*0.06;}
+function initWind(){windStreaks=[];for(let i=0;i<16;i++)windStreaks.push({x:Math.random()*W,y:20+Math.random()*180,len:5+Math.random()*10});}
 
 function startGame(){
-  genTerrain();initTanks();turn=0;newWind();state='aim';proj=null;particles=[];
+  AC(); genTerrain();initTanks();turn=0;newWind();initWind();state='aim';proj=null;particles=[];pops=[];shake=0;
   startScreen.classList.add('hidden');endScreen.classList.add('hidden');updateHUD();
   if(mode==='ai'&&turn===1)aiMove();
 }
@@ -107,6 +141,7 @@ function updateHUD(){
   document.getElementById('powV').textContent=Math.round(t.power);
   const ws=Math.abs(wind)*100;
   document.getElementById('windV').textContent=(wind>=0?'→ ':'← ')+ws.toFixed(0);
+  document.getElementById('weapV').textContent=window.t(WEAPONS[t.weapon].ko,WEAPONS[t.weapon].en);
   turnLabel.innerHTML=window.t(`<span style="color:${t.color}">● ${t.name}</span> 턴`,`<span style="color:${t.color}">● ${t.name}</span>'s turn`);
 }
 
@@ -118,22 +153,27 @@ addEventListener('keydown',e=>{
   if(k==='ArrowRight'){t.angle=Math.max(10,t.angle-2);e.preventDefault();}
   if(k==='ArrowUp'){t.power=Math.min(100,t.power+1.5);e.preventDefault();}
   if(k==='ArrowDown'){t.power=Math.max(5,t.power-1.5);e.preventDefault();}
+  if(k==='Shift'&&!e.repeat){cycleWeapon(t);e.preventDefault();}
   if(k===' '){fire();e.preventDefault();}
   updateHUD();
 });
+function cycleWeapon(t){ t=t||tanks[turn]; const i=WORDER.indexOf(t.weapon); t.weapon=WORDER[(i+1)%WORDER.length]; sfx('click'); updateHUD(); }
 document.getElementById('fireBtn').onclick=()=>{if(state==='aim'&&!(mode==='ai'&&turn===1))fire();};
+document.getElementById('weapV').onclick=()=>{if(state==='aim'&&!(mode==='ai'&&turn===1))cycleWeapon();};
 
+// 포구 시작점/속도 — fire·simulate·조준선 모두 동일하게 사용(정확도 일치)
+function muzzleAt(x,angle,power){const gy=groundY(x)-12,rad=angle*Math.PI/180,v=power*0.22;
+  return {x:x+Math.cos(rad)*22,y:gy-Math.sin(rad)*22,vx:Math.cos(rad)*v,vy:-Math.sin(rad)*v};}
 function fire(){
   if(state!=='aim')return;
-  const t=tanks[turn];
-  const gx=t.x, gy=groundY(t.x)-10;
-  const rad=t.angle*Math.PI/180;
-  const v=t.power*0.22;
-  proj={x:gx+Math.cos(rad)*22,y:gy-Math.sin(rad)*22,vx:Math.cos(rad)*v,vy:-Math.sin(rad)*v,trail:[]};
+  const t=tanks[turn], m=muzzleAt(t.x,t.angle,t.power);
+  proj={x:m.x,y:m.y,vx:m.vx,vy:m.vy,trail:[],weapon:t.weapon};
+  sfx('fire'); addShake(2);
   state='fly';
 }
 
-function explode(x,y,r){
+function explode(x,y,r,dmgMul){
+  dmgMul=dmgMul||1;
   // carve crater: lower the surface (increase terrain y) where the blast reaches
   for(let i=Math.max(0,(x-r)|0);i<Math.min(W,(x+r)|0);i++){
     const d=Math.abs(i-x);
@@ -141,12 +181,14 @@ function explode(x,y,r){
     const craterTop=y+depth;
     if(craterTop>terrain[i])terrain[i]=Math.min(H,craterTop);
   }
-  // particles
-  for(let i=0;i<30;i++){const a=Math.random()*7,s=Math.random()*5;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:25+Math.random()*15,color:['#ff5f6d','#ffc371','#fff'][i%3],r:1+Math.random()*3});}
+  // particles (폭발 크기에 비례)
+  const pc=Math.round(r*0.9);
+  for(let i=0;i<pc;i++){const a=Math.random()*7,s=Math.random()*5;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,life:25+Math.random()*15,color:['#ff5f6d','#ffc371','#fff'][i%3],r:1+Math.random()*3});}
+  sfx('explode'); addShake(Math.min(18,r*0.32));
   // damage tanks
   for(const tk of tanks){
     const dd=Math.hypot(tk.x-x,groundY(tk.x)-y);
-    if(dd<r+18){tk.hp-=Math.round((1-dd/(r+18))*45+5);if(tk.hp<0)tk.hp=0;}
+    if(dd<r+18){const dmg=Math.round(((1-dd/(r+18))*45+5)*dmgMul);tk.hp-=dmg;if(tk.hp<0)tk.hp=0;tk.flash=12;popText(tk.x,groundY(tk.x)-58,'-'+dmg,'#ff9b6d');sfx('hit');}
   }
 }
 
@@ -157,36 +199,39 @@ function settleTanks(){
 function nextTurn(){
   // check deaths
   if(tanks[0].hp<=0||tanks[1].hp<=0){
-    state='over';
+    state='over'; sfx('win');
     const winner=tanks[0].hp<=0?tanks[1]:tanks[0];
     document.getElementById('endTitle').innerHTML=window.t(`🏆 <span style="color:${winner.color}">${winner.name}</span> 승리!`,`🏆 <span style="color:${winner.color}">${winner.name}</span> wins!`);
     endScreen.classList.remove('hidden');return;
   }
-  turn=1-turn; newWind(); state='aim'; updateHUD();
+  turn=1-turn; newWind(); state='aim'; sfx('turn'); updateHUD();
   if(mode==='ai'&&turn===1)aiMove();
 }
 
 function aiMove(){
   aiThinking=true;
-  // crude: aim toward enemy with some noise, simulate to refine
+  // 적을 향해 각도·파워를 탄도 시뮬로 탐색 (난이도가 높을수록 정밀)
   const me=tanks[1],en=tanks[0];
+  const step={easy:5,normal:3,hard:2}[diff]||3;
   let bestAng=120,bestPow=55,bestDist=1e9;
-  for(let a=95;a<=170;a+=3){
-    for(let p=30;p<=100;p+=6){
+  for(let a=95;a<=170;a+=step){
+    for(let p=30;p<=100;p+=step*2){
       const d=simulate(me.x,a,p);
       const dist=Math.abs(d-en.x);
       if(dist<bestDist){bestDist=dist;bestAng=a;bestPow=p;}
     }
   }
-  // add slight inaccuracy
-  me.angle=bestAng+(Math.random()*8-4);
-  me.power=Math.max(5,Math.min(100,bestPow+(Math.random()*10-5)));
+  const noiseA={easy:14,normal:7,hard:2.5}[diff]||7, noiseP={easy:18,normal:9,hard:3}[diff]||9;
+  me.weapon = bestDist>40 ? 'normal' : 'focus';
+  if(diff==='hard'&&Math.random()<0.5)me.weapon='big';
+  me.angle=Math.max(95,Math.min(170,bestAng+(Math.random()*2-1)*noiseA));
+  me.power=Math.max(5,Math.min(100,bestPow+(Math.random()*2-1)*noiseP));
   updateHUD();
   aiTimer=50; // frames to wait then fire
 }
 function simulate(sx,angle,power){
-  const rad=angle*Math.PI/180,v=power*0.22;
-  let x=sx+Math.cos(rad)*22,y=groundY(sx)-32-Math.sin(rad)*22,vx=Math.cos(rad)*v,vy=-Math.sin(rad)*v;
+  const m=muzzleAt(sx,angle,power);
+  let x=m.x,y=m.y,vx=m.vx,vy=m.vy;
   for(let i=0;i<600;i++){vx+=wind;vy+=0.12;x+=vx;y+=vy;if(x<0||x>W)return -999;if(y>=groundY(x))return x;}
   return x;
 }
@@ -194,24 +239,35 @@ function simulate(sx,angle,power){
 function update(){
   if(state==='aim'&&mode==='ai'&&turn===1&&aiTimer>0){aiTimer--;if(aiTimer===0)fire();}
   if(state==='fly'&&proj){
+    const wp=WEAPONS[proj.weapon]||WEAPONS.normal;
     proj.vx+=wind; proj.vy+=0.12;
     proj.x+=proj.vx; proj.y+=proj.vy;
     proj.trail.push({x:proj.x,y:proj.y});if(proj.trail.length>20)proj.trail.shift();
     if(proj.x<-50||proj.x>W+50){proj=null;nextTurn();}
-    else if(proj.y>=groundY(proj.x)){explode(proj.x,groundY(proj.x),34);proj=null;state='boom';setTimeout(nextTurn,700);}
+    else if(proj.y>=groundY(proj.x)){explode(proj.x,groundY(proj.x),wp.r,wp.dmg);proj=null;state='boom';setTimeout(nextTurn,800);}
     // direct hit tank
-    else for(const tk of tanks){if(Math.hypot(tk.x-proj.x,(groundY(tk.x)-14)-proj.y)<18){explode(proj.x,proj.y,40);proj=null;state='boom';setTimeout(nextTurn,700);break;}}
+    else for(const tk of tanks){if(Math.hypot(tk.x-proj.x,(groundY(tk.x)-14)-proj.y)<18){explode(proj.x,proj.y,wp.r+6,wp.dmg);proj=null;state='boom';setTimeout(nextTurn,800);break;}}
   }
   for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;}
   particles=particles.filter(p=>p.life>0);
+  for(const pp of pops){pp.y-=0.5;pp.life--;} pops=pops.filter(pp=>pp.life>0);
+  if(tanks)for(const tk of tanks)if(tk.flash>0)tk.flash--;
+  if(shake>0.3)shake*=0.86; else shake=0;
+  for(const s of windStreaks){ s.x+=wind*120+Math.sign(wind)*0.4; if(s.x>W+20)s.x=-20; if(s.x<-20)s.x=W+20; }
 }
 
 function draw(){
   ctx.clearRect(0,0,W,H);
   const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a2a4a');g.addColorStop(1,'#0a0e1a');
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.save();
+  if(shake>0.3)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
   // stars
   ctx.fillStyle='rgba(255,255,255,.4)';for(let i=0;i<40;i++){ctx.fillRect((i*97)%W,(i*53)%200,1.5,1.5);}
+  // 바람 시각화(하늘 흐름선 — 길이/투명도가 풍속에 비례)
+  if(windStreaks.length&&Math.abs(wind)>0.002){const wl=Math.abs(wind)*180,dir=Math.sign(wind)||1;
+    ctx.strokeStyle='rgba(180,210,255,'+Math.min(0.5,0.08+Math.abs(wind)*4)+')';ctx.lineWidth=1.5;
+    for(const s of windStreaks){ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-dir*(s.len+wl),s.y);ctx.stroke();}}
   // terrain
   ctx.beginPath();ctx.moveTo(0,H);
   for(let x=0;x<W;x++)ctx.lineTo(x,terrain[x]);
@@ -230,6 +286,7 @@ function draw(){
     ctx.fillStyle=t.color;ctx.beginPath();ctx.ellipse(0,-6,18,9,0,Math.PI,0);ctx.fill();
     ctx.fillRect(-18,-6,36,7);
     ctx.fillStyle='#333';ctx.fillRect(-16,1,32,5);
+    if(t.flash>0){ctx.globalAlpha=t.flash/12*0.7;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-6,20,0,7);ctx.fill();ctx.globalAlpha=1;}
     ctx.restore();
     // hp bar
     ctx.fillStyle='#000';ctx.fillRect(t.x-22,gy-44,44,7);
@@ -240,10 +297,10 @@ function draw(){
   }
   // aim guide
   if(state==='aim'&&!(mode==='ai'&&turn===1)){
-    const t=tanks[turn],gy=groundY(t.x),rad=t.angle*Math.PI/180,v=t.power*0.22;
-    let x=t.x+Math.cos(rad)*22,y=gy-32-Math.sin(rad)*22,vx=Math.cos(rad)*v,vy=-Math.sin(rad)*v;
+    const t=tanks[turn],m=muzzleAt(t.x,t.angle,t.power);
+    let x=m.x,y=m.y,vx=m.vx,vy=m.vy;
     ctx.fillStyle='rgba(255,255,255,.5)';
-    for(let i=0;i<14;i++){vx+=wind;vy+=0.12;x+=vx*2;y+=vy*2;if(y>groundY(x))break;ctx.beginPath();ctx.arc(x,y,2,0,7);ctx.fill();}
+    for(let i=0;i<16;i++){vx+=wind;vy+=0.12;x+=vx*2;y+=vy*2;if(y>groundY(x))break;ctx.beginPath();ctx.arc(x,y,2,0,7);ctx.fill();}
   }
   // projectile
   if(proj){
@@ -252,18 +309,23 @@ function draw(){
   }
   for(const p of particles){ctx.globalAlpha=Math.min(1,p.life/20);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();}
   ctx.globalAlpha=1;
+  // 데미지 팝업
+  ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+  for(const pp of pops){ctx.globalAlpha=Math.min(1,pp.life/48);ctx.fillStyle=pp.col;ctx.fillText(pp.txt,pp.x,pp.y);}
+  ctx.globalAlpha=1;
+  ctx.restore();
   if(mode==='ai'&&turn===1&&state==='aim'){ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(window.t('🤖 AI가 조준 중...','🤖 AI is aiming...'),W/2,30);}
 }
 
 function loop(){if(state!=='menu')update();if(tanks)draw();requestAnimationFrame(loop);}
-genTerrain();initTanks();turn=0;newWind();
+genTerrain();initTanks();turn=0;newWind();initWind();
 requestAnimationFrame(loop);
 </script>
 <script src="_controls.js"></script>
 <script>
 TC.make({
   dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'},repeat:true},
-  right:[{label:'🔥',sub:window.t('발사','Fire'),key:' ',cls:'big'}]
+  right:[{label:'🔄',sub:window.t('무기','Weapon'),key:'Shift'},{label:'🔥',sub:window.t('발사','Fire'),key:' ',cls:'big'}]
 });
 </script>
 </body>
