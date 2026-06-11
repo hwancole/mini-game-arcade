@@ -188,12 +188,12 @@ function winLevel(){
   if(level>=LEVELS.length){state='over';showEnd(t('🏆 클리어!','🏆 Cleared!'),t(`모든 스테이지 완료!<br>최종 점수: <b>${score}</b>`,`All stages complete!<br>Final score: <b>${score}</b>`));}
   else{state='win';setTimeout(loadLevel,1000);}
 }
-function showEnd(t,s){
+function showEnd(title,s){
   const key='mario_best', prev=parseInt(localStorage.getItem(key)||'0');
   const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
   s+=t(`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`,`<br>🏆 Best score: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 New record!':''}`);
   s+=t(`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`,`<br><span style="font-size:.76rem;color:#9aa">Records are saved on this device only</span>`);
-  document.getElementById('endTitle').textContent=t;document.getElementById('endStats').innerHTML=s;endScreen.classList.remove('hidden');
+  document.getElementById('endTitle').textContent=title;document.getElementById('endStats').innerHTML=s;endScreen.classList.remove('hidden');
 }
 
 function draw(){
