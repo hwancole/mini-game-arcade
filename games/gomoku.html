@@ -36,6 +36,7 @@
 <div id="wrap"><canvas id="cv" width="600" height="600"></canvas></div>
 <div class="toolbar">
   <button class="btn" id="undoBtn">↩ 무르기</button>
+  <button class="btn alt" id="hintBtn" data-ko="💡 힌트" data-en="💡 Hint">💡 힌트</button>
   <button class="btn alt" id="newBtn">🔄 새 게임</button>
   <button class="btn alt" id="menuBtn">⚙️ 모드 변경</button>
 </div>
@@ -72,7 +73,34 @@ const N=20, cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const MARGIN=20, CELL=(cv.width-MARGIN*2)/(N-1), R=CELL*0.42;
 let board, turn, mode='ai', diff='easy', history, state, winLine=null, thinking=false;
 const statusEl=document.getElementById('status');
-document.getElementById('rulesHint').innerHTML=t('20×20 · 가로·세로·대각선 <b>5목</b>이면 승리 · 흑 선공 · 모바일은 교차점을 탭하세요 (기본 오목 규칙, 쌍삼 허용)','20×20 · Get <b>5 in a row</b> horizontally, vertically, or diagonally to win · Black moves first · On mobile, tap an intersection (standard Gomoku rules, double-three allowed)');
+document.getElementById('rulesHint').innerHTML=t('20×20 · 가로·세로·대각선 <b>5목</b>이면 승리 · 흑 선공 · 💡힌트로 추천 수 · 모바일은 교차점을 탭 (쌍삼 허용)','20×20 · Get <b>5 in a row</b> to win · Black first · 💡Hint suggests a move · tap an intersection on mobile (double-three allowed)');
+
+let popAnim=null, hoverCell=null, hintCell=null, animRunning=false;
+function easeBack(p){const c=1.7;return 1+(c+1)*Math.pow(p-1,3)+c*Math.pow(p-1,2);}
+// ---- 사운드 (WebAudio) ----
+let acx=null;
+function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,dur,type,vol,when){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.07,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+dur);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+dur);}
+function sfx(type){switch(type){
+  case 'black': tone(300,210,0.07,'square',0.07); break;
+  case 'white': tone(360,260,0.07,'square',0.06); break;
+  case 'win': [523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.1,i*0.1)); break;
+  case 'lose': [392,330,262,196].forEach((f,i)=>tone(f,f,0.2,'sawtooth',0.11,i*0.13)); break;
+  case 'draw': tone(440,440,0.2,'sine',0.08); break;
+  case 'undo': tone(220,320,0.08,'triangle',0.06); break;
+}}
+function ensureAnim(){ if(!animRunning){animRunning=true;requestAnimationFrame(animLoop);} }
+function animLoop(){
+  if(hintCell&&performance.now()-hintCell.t>4000)hintCell=null;   // 힌트 4초 후 사라짐
+  draw();
+  const popActive = popAnim && (performance.now()-popAnim.t<200);
+  const endHidden = document.getElementById('endScreen').classList.contains('hidden');
+  const winPulse = state==='over' && winLine && endHidden;
+  if(popActive||winPulse||hoverCell||hintCell){ requestAnimationFrame(animLoop); }
+  else { animRunning=false; draw(); }
+}
 
 // ---- 화면/메뉴 ----
 document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{
@@ -86,13 +114,15 @@ document.getElementById('againBtn').onclick=startGame;
 document.getElementById('menuBtn').onclick=showMenu;
 document.getElementById('endMenuBtn').onclick=showMenu;
 document.getElementById('undoBtn').onclick=undo;
+document.getElementById('hintBtn').onclick=hint;
 
 function showMenu(){state='menu';clearFloat();document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
 
 function startGame(){
   board=Array.from({length:N},()=>Array(N).fill(0));
-  clearFloat();
+  clearFloat(); AC();
   turn=1; history=[]; winLine=null; state='play'; thinking=false;
+  popAnim=null; hintCell=null; hoverCell=null;
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
   updateStatus(); draw();
@@ -117,9 +147,11 @@ function showRecord(){
 // ---- 입력 ----
 function place(x,y){
   if(state!=='play'||thinking||board[y][x]!==0)return;
+  sfx(turn===1?'black':'white');
   board[y][x]=turn; history.push([x,y,turn]);
+  popAnim={x,y,t:performance.now()}; hintCell=null;
   const win=checkWin(x,y,turn);
-  draw();
+  ensureAnim();
   if(win){endGame(turn);return;}
   if(history.length===N*N){endGame(0);return;}
   turn=3-turn; updateStatus();
@@ -127,7 +159,19 @@ function place(x,y){
 }
 cv.addEventListener('click',e=>{const p=toCell(e.clientX,e.clientY);if(p)userPlace(p);});
 cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];const p=toCell(t.clientX,t.clientY);if(p)userPlace(p);},{passive:false});
+// 데스크톱 호버 미리보기
+cv.addEventListener('mousemove',e=>{
+  if(state!=='play'||thinking||(mode==='ai'&&turn!==1)){ if(hoverCell){hoverCell=null;ensureAnim();} return; }
+  const p=toCell(e.clientX,e.clientY); const nc=(p&&board[p.y][p.x]===0)?p:null;
+  if((nc&&(!hoverCell||hoverCell.x!==nc.x||hoverCell.y!==nc.y))||(!nc&&hoverCell)){ hoverCell=nc; ensureAnim(); }
+});
+cv.addEventListener('mouseleave',()=>{ if(hoverCell){hoverCell=null;ensureAnim();} });
 function userPlace(p){ if(mode==='ai'&&turn!==1)return; place(p.x,p.y); }
+function hint(){
+  if(state!=='play'||thinking||(mode==='ai'&&turn!==1))return;
+  AC(); const mv=findBestMove(turn,'normal');
+  if(mv){ hintCell={x:mv[0],y:mv[1],t:performance.now()}; ensureAnim(); }
+}
 function toCell(cx,cy){
   const r=cv.getBoundingClientRect();
   const x=(cx-r.left)*(cv.width/r.width), y=(cy-r.top)*(cv.height/r.height);
@@ -141,6 +185,7 @@ function undo(){
   if(state!=='play'||thinking||history.length===0)return;
   const steps=(mode==='ai'&&history.length>=2)?2:1; // AI전은 내수+AI수 함께 취소
   for(let i=0;i<steps&&history.length;i++){const [x,y]=history.pop();board[y][x]=0;}
+  sfx('undo'); popAnim=null; hintCell=null;
   turn=(mode==='ai')?1:3-turn; winLine=null; updateStatus(); draw();
 }
 
@@ -160,12 +205,13 @@ let pendingEndTitle='';
 function endGame(winner){
   state='over';
   let title;
-  if(winner===0)title=t('무승부!','Draw!');
+  if(winner===0){title=t('무승부!','Draw!');sfx('draw');}
   else if(mode==='ai'){
     const youWin=winner===1; title=youWin?t('🏆 승리!','🏆 You win!'):t('😢 패배 — 어디서 5목을 내줬는지 확인해보세요','😢 You lose — review where the five-in-a-row was made');
+    sfx(youWin?'win':'lose');
     const r=loadRec(); r[diff]=r[diff]||{w:0,l:0}; if(youWin)r[diff].w++;else r[diff].l++;
     localStorage.setItem('gomoku_record',JSON.stringify(r));
-  } else title=(winner===1?t('⚫ 흑','⚫ Black'):t('⚪ 백','⚪ White'))+t(' 승리!',' wins!');
+  } else {title=(winner===1?t('⚫ 흑','⚫ Black'):t('⚪ 백','⚪ White'))+t(' 승리!',' wins!');sfx('win');}
   pendingEndTitle=title;
   showRecord();
   // 1.8초간 바둑판(승리 줄 강조)을 먼저 보여준 뒤 결과 표시
@@ -315,21 +361,30 @@ function draw(){
   // 화점
   ctx.fillStyle='#6b4a23';[[3,3],[3,N-4],[N-4,3],[N-4,N-4],[(N>>1),(N>>1)]].forEach(([gx,gy])=>{
     ctx.beginPath();ctx.arc(MARGIN+gx*CELL,MARGIN+gy*CELL,3,0,7);ctx.fill();});
-  // 돌
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(board[y][x])drawStone(x,y,board[y][x]);
+  // 돌 (마지막 수는 팝인 애니메이션)
+  const now=performance.now();
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(board[y][x]){
+    let sc=1; if(popAnim&&popAnim.x===x&&popAnim.y===y){const pr=Math.min(1,(now-popAnim.t)/150);sc=easeBack(pr);}
+    drawStone(x,y,board[y][x],sc);
+  }
+  // 호버 미리보기(데스크톱)
+  if(hoverCell&&state==='play'&&!thinking&&board[hoverCell.y][hoverCell.x]===0){ ctx.globalAlpha=0.4; drawStone(hoverCell.x,hoverCell.y,turn,1); ctx.globalAlpha=1; }
   // 마지막 수 강조
   if(history.length){const [lx,ly]=history[history.length-1];
     ctx.strokeStyle='#ff3b3b';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(MARGIN+lx*CELL,MARGIN+ly*CELL,R*0.5,0,7);ctx.stroke();}
-  // 승리 라인
-  if(winLine){ctx.strokeStyle='#22ff88';ctx.lineWidth=4;ctx.lineCap='round';
+  // 힌트 마커
+  if(hintCell){const cx=MARGIN+hintCell.x*CELL,cy=MARGIN+hintCell.y*CELL,pulse=0.5+0.5*Math.sin(now/180);
+    ctx.strokeStyle='rgba(90,160,255,'+(0.4+0.5*pulse)+')';ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,R*0.85,0,7);ctx.stroke();}
+  // 승리 라인(펄스)
+  if(winLine){const pulse=0.6+0.4*Math.sin(now/150);ctx.strokeStyle='rgba(34,255,136,'+pulse+')';ctx.lineWidth=4+pulse*3;ctx.lineCap='round';
     const a=winLine[0],b=winLine[winLine.length-1];
     ctx.beginPath();ctx.moveTo(MARGIN+a[0]*CELL,MARGIN+a[1]*CELL);ctx.lineTo(MARGIN+b[0]*CELL,MARGIN+b[1]*CELL);ctx.stroke();}
 }
-function drawStone(x,y,p){
-  const cx=MARGIN+x*CELL, cy=MARGIN+y*CELL;
-  const g=ctx.createRadialGradient(cx-R*0.3,cy-R*0.3,R*0.1,cx,cy,R);
+function drawStone(x,y,p,scale){
+  scale=scale||1; const cx=MARGIN+x*CELL, cy=MARGIN+y*CELL, r=R*scale;
+  const g=ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
   if(p===1){g.addColorStop(0,'#555');g.addColorStop(1,'#000');}else{g.addColorStop(0,'#fff');g.addColorStop(1,'#bbb');}
-  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fill();
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
 }
 showMenu();
 </script>
