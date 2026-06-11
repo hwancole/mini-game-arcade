@@ -24,6 +24,10 @@
   .sq .dot{position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(40,80,40,.55)}
   .sq.cap .dot{width:88%;height:88%;background:none;border:4px solid rgba(40,120,40,.6);border-radius:50%}
   .sq .pc{pointer-events:none}
+  .sq .coord{position:absolute;font-size:9px;font-weight:bold;color:#3a2a18;opacity:.6;pointer-events:none}
+  .sq .coord.f{right:2px;bottom:1px}.sq .coord.r{left:2px;top:1px}
+  .sq.hintsq{box-shadow:inset 0 0 0 4px rgba(120,180,255,.8)}
+  .adv{color:#8ec98e;font-weight:bold;margin-left:6px;font-size:.95rem}
   .sq .pc.w{color:#fff;text-shadow:0 1px 2px #000,0 0 2px #000}
   .sq .pc.b{color:#1a1a1a;text-shadow:0 1px 1px rgba(255,255,255,.3)}
   .toolbar{display:flex;gap:8px;margin:10px;flex-wrap:wrap;justify-content:center}
@@ -60,12 +64,13 @@
 <div class="captured" id="capBot"></div>
 <div class="toolbar">
   <button class="btn" id="undoBtn">↩ 무르기</button>
+  <button class="btn alt" id="hintBtn" data-ko="💡 힌트" data-en="💡 Hint">💡 힌트</button>
   <button class="btn alt" id="newBtn">🔄 새 게임</button>
   <button class="btn alt" id="flipBtn">🔃 보드 회전</button>
   <button class="btn alt" id="menuBtn">⚙️ 모드</button>
 </div>
 <div id="moves"></div>
-<p class="hint" data-ko="유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원" data-en="Unicode pieces · Tap a piece to see its legal moves · Choose a piece on pawn promotion · King's square turns red in check · Castling, en passant & promotion all supported">유니코드 기물 · 기물을 탭하면 이동 가능 칸 표시 · 폰 승급 시 기물 선택 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
+<p class="hint" data-ko="기물을 탭하면 이동 가능 칸 표시 · 💡힌트로 추천 수 확인 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원" data-en="Tap a piece to see its legal moves · 💡Hint suggests a move · the +number by captures shows material lead · king's square turns red in check · castling, en passant & promotion supported">기물을 탭하면 이동 가능 칸 표시 · 💡힌트로 추천 수 확인 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
 
 <div class="overlay" id="startScreen">
   <h2 data-ko="♟️ 체스" data-en="♟️ Chess">♟️ 체스</h2>
@@ -126,6 +131,34 @@ const PST={
 let Game, game, mode='ai', mySide='w', diff='normal', orient='w', rotate=false;
 let state='menu', sel=null, legalForSel=[], pendingPromo=null, lastMove=null, thinking=false;
 const boardEl=document.getElementById('board'), statusEl=document.getElementById('status');
+let hintMove=null;
+
+// ---- 사운드 (WebAudio) ----
+let acx=null;
+function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,dur,type,vol,when){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(when||0);
+  o.type=type||'sine';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+dur);
+  g.gain.setValueAtTime(vol||0.08,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+dur);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+dur);}
+function noise(dur,vol){const a=AC();if(!a)return;const n=a.sampleRate*dur|0,buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=a.createBufferSource();s.buffer=buf;const g=a.createGain();g.gain.value=vol||0.1;s.connect(g);g.connect(a.destination);s.start();}
+function sfx(type){switch(type){
+  case 'move': tone(240,200,0.06,'sine',0.09); break;
+  case 'capture': tone(170,90,0.1,'square',0.09); noise(0.08,0.08); break;
+  case 'castle': tone(200,300,0.13,'square',0.08); break;
+  case 'promote': tone(523,880,0.16,'square',0.1); tone(659,1047,0.14,'square',0.1,0.12); break;
+  case 'check': tone(680,460,0.16,'sawtooth',0.1); break;
+  case 'end': [523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.1,i*0.11)); break;
+}}
+function playMoveSound(res){
+  if(!res)return;
+  if(game.in_checkmate()){sfx('end');return;}
+  if(game.in_check()){sfx('check');return;}
+  const fl=res.flags||'';
+  if(fl.includes('k')||fl.includes('q')){sfx('castle');return;}
+  if(fl.includes('p')){sfx('promote');return;}
+  if(res.captured||fl.includes('e')||fl.includes('c')){sfx('capture');return;}
+  sfx('move');
+}
 
 // ---- chess.js 로더 (CDN 장애 대비) ----
 (function waitLib(t){
@@ -156,10 +189,11 @@ function showMenu(){state='menu';document.getElementById('startScreen').classLis
 
 function start(){
   if(!Game){return;}
+  AC();
   game=new Game();
   rotate=document.getElementById('rotChk').checked;
   orient = mode==='ai' ? mySide : 'w';
-  sel=null;legalForSel=[];lastMove=null;pendingPromo=null;thinking=false;state='play';
+  sel=null;legalForSel=[];lastMove=null;pendingPromo=null;thinking=false;hintMove=null;state='play';
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
   buildBoard();render();
@@ -193,7 +227,11 @@ function render(){
     if(sel===sqn)cell.classList.add('sel');
     if(lastMove&&(lastMove.from===sqn||lastMove.to===sqn))cell.classList.add('last');
     if(kingSq===sqn)cell.classList.add('check');
+    if(hintMove&&(hintMove.from===sqn||hintMove.to===sqn))cell.classList.add('hintsq');
     if(legalForSel.includes(sqn)){const dot=document.createElement('div');dot.className='dot';cell.appendChild(dot);if(p)cell.classList.add('cap');}
+    const dr=Math.floor(i/8), dc=i%8;
+    if(dc===0){const rl=document.createElement('span');rl.className='coord r';rl.textContent=sqn[1];cell.appendChild(rl);}
+    if(dr===7){const fl=document.createElement('span');fl.className='coord f';fl.textContent=sqn[0];cell.appendChild(fl);}
   }
   renderCaptured();renderMoves();updateStatus();
 }
@@ -207,12 +245,15 @@ function updateStatus(){
 }
 function renderCaptured(){
   const hist=game.history({verbose:true});
-  const capByWhite=[], capByBlack=[];
-  for(const m of hist){ if(m.captured){ (m.color==='w'?capByWhite:capByBlack).push(GLYPH[m.color==='w'?'b':'w'][m.captured]); } }
-  // 상단=화면 위쪽 진영이 잡은 것
+  const capByWhite=[], capByBlack=[]; let valW=0,valB=0;
+  for(const m of hist){ if(m.captured){ if(m.color==='w'){capByWhite.push(GLYPH.b[m.captured]);valW+=PVAL[m.captured];} else {capByBlack.push(GLYPH.w[m.captured]);valB+=PVAL[m.captured];} } }
+  const advW=(valW-valB)/100; // 양수면 백 우세
+  const fmt=n=>(+n.toFixed(1)).toString();
+  const wRow=capByWhite.join('')+(advW>0?` <span class="adv">+${fmt(advW)}</span>`:'');
+  const bRow=capByBlack.join('')+(advW<0?` <span class="adv">+${fmt(-advW)}</span>`:'');
   const topIsWhite = orient==='b';
-  document.getElementById('capTop').textContent=(topIsWhite?capByWhite:capByBlack).join('');
-  document.getElementById('capBot').textContent=(topIsWhite?capByBlack:capByWhite).join('');
+  document.getElementById('capTop').innerHTML=topIsWhite?wRow:bRow;
+  document.getElementById('capBot').innerHTML=topIsWhite?bRow:wRow;
 }
 function renderMoves(){
   const h=game.history();
@@ -259,7 +300,8 @@ function showPromo(){
 function applyMove(m){
   const res=game.move(m);
   if(!res){sel=null;legalForSel=[];render();return;}
-  lastMove={from:res.from,to:res.to};sel=null;legalForSel=[];
+  lastMove={from:res.from,to:res.to};sel=null;legalForSel=[];hintMove=null;
+  playMoveSound(res);
   if(mode==='2p'&&rotate)orient=game.turn();
   render();
   if(checkEnd())return;
@@ -307,8 +349,24 @@ function leafEval(depth){
   if(game.in_draw()||game.in_stalemate())return 0;
   return evalBoard();
 }
+// 정지 탐색: 잎 노드에서 캡처/승급만 계속 따라가 호라이즌 효과(되잡기 직전 잘못된 평가)를 줄임
+function quiesce(alpha,beta){
+  if(game.game_over())return leafEval(0);
+  const stand=evalBoard();
+  if(performance.now()>deadline)return stand;
+  const white=game.turn()==='w';
+  if(white){ if(stand>=beta)return stand; if(stand>alpha)alpha=stand; }
+  else { if(stand<=alpha)return stand; if(stand<beta)beta=stand; }
+  const caps=orderMoves(game.moves({verbose:true}).filter(m=>m.captured||(m.flags&&m.flags.indexOf('p')>=0)));
+  let best=stand;
+  for(const m of caps){ game.move(m); const v=quiesce(alpha,beta); game.undo();
+    if(white){ if(v>best)best=v; if(best>alpha)alpha=best; } else { if(v<best)best=v; if(best<beta)beta=best; }
+    if(alpha>=beta)break; if(performance.now()>deadline)break; }
+  return best;
+}
 function minimax(depth,alpha,beta){
-  if(depth===0||game.game_over())return leafEval(depth);
+  if(game.game_over())return leafEval(depth);
+  if(depth===0)return quiesce(alpha,beta);
   if(performance.now()>deadline)return evalBoard();
   const moves=orderMoves(game.moves({verbose:true}));
   if(game.turn()==='w'){let best=-Infinity;
@@ -321,26 +379,46 @@ function minimax(depth,alpha,beta){
     return best;
   }
 }
+// 반복 심화(iterative deepening): 시간 예산 내에서 점점 깊게 — 직전 최선수를 먼저 탐색해 가지치기 향상
+function searchBest(maxDepth,ms){
+  deadline=performance.now()+ms;
+  const white=game.turn()==='w';
+  let rootMoves=orderMoves(game.moves({verbose:true}));
+  let best=rootMoves[0];
+  for(let d=1; d<=maxDepth; d++){
+    let curBest=null,curV=white?-Infinity:Infinity;
+    const ordered=best?[best,...rootMoves.filter(m=>!(m.from===best.from&&m.to===best.to&&m.promotion===best.promotion))]:rootMoves;
+    for(const m of ordered){
+      game.move(m);const v=minimax(d-1,-Infinity,Infinity);game.undo();
+      if(white?v>curV:v<curV){curV=v;curBest=m;}
+      if(performance.now()>deadline)break;
+    }
+    if(curBest)best=curBest;
+    if(performance.now()>deadline)break;
+  }
+  return best;
+}
 function aiMove(){
   if(state!=='play')return;
   thinking=true;render();
   setTimeout(()=>{
-    const depth={easy:1,normal:2,hard:3}[diff];
-    deadline=performance.now()+1900;
-    const moves=orderMoves(game.moves({verbose:true}));
-    const white=game.turn()==='w';
-    let best=moves[0],bestV=white?-Infinity:Infinity;
-    for(const m of moves){
-      game.move(m);const v=minimax(depth-1,-Infinity,Infinity);game.undo();
-      if(white?v>bestV:v<bestV){bestV=v;best=m;}
-    }
+    const maxDepth={easy:2,normal:3,hard:4}[diff];
+    let best=searchBest(maxDepth, {easy:500,normal:1300,hard:2400}[diff]);
     // 쉬움: 가끔 차선책으로 약하게
+    const moves=game.moves({verbose:true});
     if(diff==='easy'&&moves.length>3&&Math.random()<0.35){best=moves[Math.floor(Math.random()*Math.min(5,moves.length))];}
     thinking=false;
-    if(best){game.move(best);lastMove={from:best.from,to:best.to};if(mode==='2p'&&rotate)orient=game.turn();render();checkEnd();}
+    if(best){const res=game.move(best);lastMove={from:best.from,to:best.to};playMoveSound(res);if(mode==='2p'&&rotate)orient=game.turn();render();checkEnd();}
     else render();
   },60);
 }
+function hint(){
+  if(state!=='play'||thinking||!game||game.game_over())return;
+  if(mode==='ai'&&game.turn()!==mySide)return;
+  const best=searchBest(2,500);
+  if(best){hintMove={from:best.from,to:best.to};sel=null;legalForSel=[];render();}
+}
+document.getElementById('hintBtn').onclick=hint;
 showMenu();
 </script>
 </body>
