@@ -32,7 +32,8 @@
     <h2>점프 어드벤처</h2>
     <p class="hint">적을 밟아 처치하고 코인을 모아 깃발까지! 구덩이에 빠지거나 적에게 부딪히면 게임오버.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd>/<kbd>↑</kbd> 점프 (길게 누르면 높이) · <kbd>Shift</kbd> 달리기</p>
+    <p class="hint">🖥️ PC: <kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd>/<kbd>↑</kbd> 점프(길게=높이) · <kbd>Shift</kbd> 달리기<br>
+    📱 모바일: 왼쪽 <b>◀▶</b> 이동 · 오른쪽 <b>점프/달리기</b> 버튼</p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -186,7 +187,13 @@ function winLevel(){
   if(level>=LEVELS.length){state='over';showEnd('🏆 클리어!',`모든 스테이지 완료!<br>최종 점수: <b>${score}</b>`);}
   else{state='win';setTimeout(loadLevel,1000);}
 }
-function showEnd(t,s){document.getElementById('endTitle').textContent=t;document.getElementById('endStats').innerHTML=s;endScreen.classList.remove('hidden');}
+function showEnd(t,s){
+  const key='mario_best', prev=parseInt(localStorage.getItem(key)||'0');
+  const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
+  s+=`<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`;
+  s+=`<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
+  document.getElementById('endTitle').textContent=t;document.getElementById('endStats').innerHTML=s;endScreen.classList.remove('hidden');
+}
 
 function draw(){
   ctx.clearRect(0,0,W,H);
@@ -246,6 +253,7 @@ requestAnimationFrame(loop);
 <script src="_controls.js"></script>
 <script>
 TC.make({
+  landscape:true,
   left:[{label:'◀',key:'ArrowLeft',cls:'big'},{label:'▶',key:'ArrowRight',cls:'big'}],
   right:[{label:'🏃',sub:'달리기',key:'Shift'},{label:'⤴',sub:'점프',key:' ',cls:'big'}]
 });

@@ -34,8 +34,9 @@
     <h2>카트 레이싱</h2>
     <p class="hint">3바퀴를 가장 먼저 완주하세요! 트랙을 벗어나면 속도가 느려집니다.</p>
     <button class="btn" id="startBtn">레이스 시작 🏁</button>
-    <p class="hint"><kbd>↑</kbd> 가속 · <kbd>↓</kbd> 브레이크/후진 · <kbd>←</kbd><kbd>→</kbd> 조향 ·
-    <kbd>Shift</kbd> 드리프트(부스터 충전) · <kbd>Space</kbd> 부스터</p>
+    <p class="hint">🖥️ PC: <kbd>↑</kbd> 가속 · <kbd>↓</kbd> 브레이크/후진 · <kbd>←</kbd><kbd>→</kbd> 조향 ·
+    <kbd>Shift</kbd> 드리프트 · <kbd>Space</kbd> 부스터<br>
+    📱 모바일: 왼쪽 <b>D-패드</b>로 가속·조향 · 오른쪽 <b>드리프트/부스터</b> 버튼</p>
   </div>
   <div class="overlay hidden" id="endScreen">
     <h2 id="endTitle"></h2>
@@ -189,7 +190,14 @@ function endRace(){
   const player=karts[0];
   const rank=sorted.indexOf(player)+1;
   document.getElementById('endTitle').textContent= rank===1?'🏆 1위! 우승!':`${rank}위로 완주`;
-  let s=`기록: <b>${(player.finishT/1000).toFixed(2)}초</b><br><br>`;
+  let s='';
+  if(player.finished){
+    const t=player.finishT/1000, key='racing_best', prev=parseFloat(localStorage.getItem(key)||'0');
+    const isNew=!prev||t<prev; if(isNew)localStorage.setItem(key,t.toFixed(2));
+    const bestNow=isNew?t:prev;
+    s+=`기록: <b>${t.toFixed(2)}초</b><br>🏆 최고 랩: <b>${bestNow.toFixed(2)}초</b>${isNew?' 🎉 신기록!':''}<br>`;
+    s+=`<span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span><br><br>`;
+  } else s+='미완주<br><br>';
   sorted.forEach((k,i)=>{s+=`${i+1}위 - ${k.name} ${k.finished?'('+(k.finishT/1000).toFixed(2)+'s)':'(미완주)'}<br>`;});
   document.getElementById('endStats').innerHTML=s;
   endScreen.classList.remove('hidden');
@@ -255,6 +263,7 @@ initKarts(); requestAnimationFrame(loop);
 <script src="_controls.js"></script>
 <script>
 TC.make({
+  landscape:true,
   dpad:{keys:{up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'}},
   right:[{label:'🌀',sub:'드리프트',key:'Shift'},{label:'🚀',sub:'부스터',key:' ',cls:'big'}]
 });

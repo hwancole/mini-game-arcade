@@ -33,7 +33,8 @@
     <h2>벽돌깨기</h2>
     <p class="hint">공으로 모든 벽돌을 깨세요! 아이템을 받아 패들을 강화하세요.</p>
     <button class="btn" id="startBtn">시작 ▶</button>
-    <p class="hint"><kbd>마우스</kbd> 또는 <kbd>←→</kbd> 패들 이동 · <kbd>클릭/Space</kbd> 발사<br>
+    <p class="hint">🖥️ PC: <kbd>마우스</kbd>/<kbd>←→</kbd> 패들 이동 · <kbd>클릭/Space</kbd> 발사<br>
+    📱 모바일: <b>화면을 좌우로 드래그</b>해 패들 이동 · <b>탭</b>하면 발사<br>
     🟩 확대 · 🟦 멀티볼 · 🟪 느리게 · 🟥 축소</p>
   </div>
   <div class="overlay hidden" id="endScreen">
@@ -142,7 +143,11 @@ function update(){
 function end(win){
   state='over';
   document.getElementById('endTitle').textContent=win?'🏆 클리어!':'💀 게임 오버';
-  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 레벨 ${level}`;
+  const key='breakout_best', prev=parseInt(localStorage.getItem(key)||'0');
+  const isNew=score>prev; if(isNew)localStorage.setItem(key,score);
+  document.getElementById('endStats').innerHTML=`점수: <b>${score}</b> · 레벨 ${level}`+
+    `<br>🏆 최고 점수: <b>${Math.max(prev,score)}</b>${isNew?' 🎉 신기록!':''}`+
+    `<br><span style="font-size:.76rem;color:#9aa">기록은 이 기기에만 저장됩니다</span>`;
   document.getElementById('endScreen').classList.remove('hidden');
 }
 

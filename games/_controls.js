@@ -41,6 +41,19 @@
     return b;
   }
 
+  function rotateTip(){
+    if(!isTouch || document.getElementById('tc-rotate')) return;
+    const tip=document.createElement('div'); tip.id='tc-rotate'; let closed=false, timer=null;
+    tip.innerHTML='📱 가로 모드로 돌리면 더 크고 편하게 즐길 수 있어요 <span style="opacity:.7">(탭하여 닫기)</span>';
+    tip.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9500;background:rgba(95,159,255,.95);color:#fff;font-size:.78rem;font-weight:700;text-align:center;padding:8px 10px;display:none;cursor:pointer';
+    document.body.appendChild(tip);
+    const hide=()=>{ tip.style.display='none'; if(timer){clearTimeout(timer);timer=null;} };
+    const show=()=>{ if(closed)return; tip.style.display='block'; if(timer)clearTimeout(timer); timer=setTimeout(hide,5000); }; // 5초 후 자동 숨김
+    const check=()=>{ if(window.innerHeight>window.innerWidth) show(); else hide(); };
+    check(); window.addEventListener('resize',check);
+    window.addEventListener('orientationchange',()=>setTimeout(check,250));
+    tip.addEventListener('click',()=>{closed=true;hide();});
+  }
   function bar(){
     let el=document.getElementById('tc-bar');
     if(!el){ el=document.createElement('div'); el.id='tc-bar';
@@ -72,8 +85,11 @@
       }
       (config.left||[]).forEach(def=>left.appendChild(makeBtn(def)));
       (config.right||[]).forEach(def=>right.appendChild(makeBtn(def)));
+      if(config.landscape) rotateTip();
       return el;
     },
+    /* 가로 모드 권장 배너 (세로일 때만 표시) */
+    rotateHint(){ rotateTip(); },
     clear(){ const el=document.getElementById('tc-bar'); if(el)el.remove(); document.body.classList.remove('tc-on'); },
     button:makeBtn
   };

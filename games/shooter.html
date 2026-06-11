@@ -44,8 +44,9 @@
     </div>
     <button class="btn" id="startBtn">게임 시작 ▶</button>
     <p class="hint">
-      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 마우스 조준 ·
-      <kbd>좌클릭</kbd> 발사 · <kbd>R</kbd> 재장전 · <kbd>Shift</kbd> 달리기
+      🖥️ PC: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · 마우스 조준 ·
+      <kbd>좌클릭</kbd> 발사 · <kbd>R</kbd> 재장전 · <kbd>Shift</kbd> 달리기<br>
+      📱 모바일: 왼쪽 <b>D-패드</b> 이동 · <b>화면을 터치</b>하면 그 방향으로 조준·자동발사 · 오른쪽 버튼 재장전/달리기
     </p>
   </div>
 
@@ -143,8 +144,13 @@ function startGame(){
 function endGame(win){
   state='over';
   document.getElementById('endTitle').textContent = win?'🏆 승리!':'💀 게임 오버';
+  const key='shooter_best_'+mode, prevBest=parseInt(localStorage.getItem(key)||'0');
+  const isNew=kills>prevBest; if(isNew)localStorage.setItem(key,kills);
+  const bestNow=Math.max(prevBest,kills);
   let stats = `처치한 적: <b>${kills}</b>`;
   if(mode==='infinite') stats += ` · 웨이브: <b>${wave}</b>`;
+  stats += `<br>🏆 최고 기록: <b>${bestNow}</b>킬${isNew?' 🎉 신기록!':''}`;
+  stats += `<br><span style="font-size:.76rem;color:#667">기록은 이 기기에만 저장됩니다</span>`;
   document.getElementById('endStats').innerHTML = stats;
   endScreen.classList.remove('hidden');
 }
@@ -387,6 +393,7 @@ requestAnimationFrame(loop);
 <script src="_controls.js"></script>
 <script>
 TC.make({
+  landscape:true,
   dpad:{keys:{up:'w',down:'s',left:'a',right:'d'}},
   right:[{label:'🔄',sub:'재장전',key:'r'},{label:'🏃',sub:'달리기',key:'Shift'}]
 });
