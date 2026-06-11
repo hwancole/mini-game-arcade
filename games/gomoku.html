@@ -60,8 +60,10 @@
 </div>
 <div class="overlay hidden" id="endScreen">
   <h2 id="endTitle"></h2>
+  <button class="btn alt" id="reviewBtn">🔍 바둑판 다시 보기</button>
   <button class="btn" id="againBtn">🔄 다시</button>
   <button class="btn alt" id="endMenuBtn">모드 변경</button>
+  <a class="btn alt" href="../index.html">🏠 홈으로</a>
 </div>
 
 <script>
@@ -83,10 +85,11 @@ document.getElementById('menuBtn').onclick=showMenu;
 document.getElementById('endMenuBtn').onclick=showMenu;
 document.getElementById('undoBtn').onclick=undo;
 
-function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
+function showMenu(){state='menu';clearFloat();document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
 
 function startGame(){
   board=Array.from({length:N},()=>Array(N).fill(0));
+  clearFloat();
   turn=1; history=[]; winLine=null; state='play'; thinking=false;
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -151,19 +154,35 @@ function checkWin(x,y,p){
 }
 function inb(x,y){return x>=0&&x<N&&y>=0&&y<N;}
 
+let pendingEndTitle='';
 function endGame(winner){
   state='over';
   let title;
   if(winner===0)title='무승부!';
   else if(mode==='ai'){
-    const youWin=winner===1; title=youWin?'🏆 승리!':'😢 패배';
+    const youWin=winner===1; title=youWin?'🏆 승리!':'😢 패배 — 어디서 5목을 내줬는지 확인해보세요';
     const r=loadRec(); r[diff]=r[diff]||{w:0,l:0}; if(youWin)r[diff].w++;else r[diff].l++;
     localStorage.setItem('gomoku_record',JSON.stringify(r));
   } else title=(winner===1?'⚫ 흑':'⚪ 백')+' 승리!';
-  document.getElementById('endTitle').textContent=title;
-  document.getElementById('endScreen').classList.remove('hidden');
+  pendingEndTitle=title;
   showRecord();
+  // 1.8초간 바둑판(승리 줄 강조)을 먼저 보여준 뒤 결과 표시
+  setTimeout(showEndScreen,1800);
 }
+function showEndScreen(){
+  if(state!=='over')return;
+  document.getElementById('endTitle').textContent=pendingEndTitle;
+  document.getElementById('endScreen').classList.remove('hidden');
+}
+function clearFloat(){const f=document.getElementById('floatReview');if(f)f.remove();}
+document.getElementById('reviewBtn').onclick=()=>{
+  document.getElementById('endScreen').classList.add('hidden');
+  if(document.getElementById('floatReview'))return;
+  const b=document.createElement('button');b.id='floatReview';b.textContent='📋 결과 다시 보기';
+  b.style.cssText='position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:30;background:#d9a86a;color:#2a1d0e;border:none;padding:12px 24px;border-radius:24px;font-weight:bold;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5)';
+  b.onclick=()=>{document.getElementById('endScreen').classList.remove('hidden');b.remove();};
+  document.body.appendChild(b);
+};
 
 // ================= AI (미니맥스 + 알파베타) =================
 function aiTurn(){
