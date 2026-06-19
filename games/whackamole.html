@@ -96,6 +96,11 @@ const boardEl=document.getElementById('board');
 const scoreEl=document.getElementById('score'),timeEl=document.getElementById('time'),
       comboEl=document.getElementById('combo'),bestEl=document.getElementById('best');
 let holes=[], score, combo, timeLeft, running, spawnTO, timerIv;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.07,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function nz(d,v){const a=AC();if(!a)return;const n=a.sampleRate*d|0,b=a.createBuffer(1,n,a.sampleRate),dd=b.getChannelData(0);for(let i=0;i<n;i++)dd[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=a.createBufferSource();s.buffer=b;const g=a.createGain();g.gain.value=v||0.12;s.connect(g);g.connect(a.destination);s.start();}
+function sfx(x){if(x==='whack')tone(600,880,0.06,'square',0.08);else if(x==='gold'){tone(700,1050,0.1,'square',0.08);tone(1000,1500,0.1,'square',0.07,0.08);}else if(x==='bomb'){tone(160,40,0.25,'sawtooth',0.13);nz(0.2,0.13);}else if(x==='tick')tone(900,900,0.05,'square',0.05);else if(x==='end')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.1));}
 
 document.querySelectorAll('.diffs .d').forEach(d=>d.onclick=()=>{
   document.querySelectorAll('.diffs .d').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');diff=d.dataset.d;
@@ -119,13 +124,14 @@ function buildBoard(){
 function showBest(){bestEl.textContent=localStorage.getItem('mole_best_'+diff)||0;}
 
 function startGame(){
+  AC();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
   score=0;combo=0;timeLeft=SET[diff].time;running=true;
   scoreEl.textContent=0;comboEl.textContent=0;timeEl.textContent=timeLeft;showBest();
   holes.forEach(h=>setDown(h));
   clearInterval(timerIv);
-  timerIv=setInterval(()=>{timeLeft--;timeEl.textContent=timeLeft;if(timeLeft<=0)endGame();},1000);
+  timerIv=setInterval(()=>{timeLeft--;timeEl.textContent=timeLeft;if(timeLeft<=5&&timeLeft>0)sfx('tick');if(timeLeft<=0)endGame();},1000);
   scheduleSpawn();
 }
 function scheduleSpawn(){
@@ -159,13 +165,14 @@ function whack(h,e){
   h.el.classList.add('bonk');
   setTimeout(()=>setDown(h),250);
   let pts;
-  if(type==='bomb'){pts=-20;combo=0;floatText(e.clientX,e.clientY,'💥 -20','#ff3b3b');}
+  if(type==='bomb'){pts=-20;combo=0;floatText(e.clientX,e.clientY,'💥 -20','#ff3b3b');sfx('bomb');}
   else{
     combo++;
     const base=type==='gold'?30:10;
     const bonus=Math.floor(combo/3)*5;
     pts=base+bonus;
     floatText(e.clientX,e.clientY,`+${pts}${combo>=3?' 🔥x'+combo:''}`,type==='gold'?'#ffd700':'#2e7d32');
+    sfx(type==='gold'?'gold':'whack');
   }
   score=Math.max(0,score+pts);
   scoreEl.textContent=score;comboEl.textContent=combo;
@@ -177,7 +184,7 @@ function floatText(x,y,txt,color){
 }
 
 function endGame(){
-  running=false;clearInterval(timerIv);clearTimeout(spawnTO);
+  running=false;sfx('end');clearInterval(timerIv);clearTimeout(spawnTO);
   holes.forEach(h=>setDown(h));
   const best=parseInt(localStorage.getItem('mole_best_'+diff)||'0');
   let msg=t(`최종 점수: <b>${score}</b>`,`Final score: <b>${score}</b>`);

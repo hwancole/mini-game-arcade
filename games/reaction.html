@@ -43,32 +43,38 @@ const lastEl=document.getElementById('last'),avgEl=document.getElementById('avg'
 let state='idle',startT,timeoutId,times=[];
 let best=parseInt(localStorage.getItem('reaction_best')||'0');
 if(best)bestEl.textContent=best+'ms';
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.08,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='go')tone(660,990,0.12,'square',0.1);else if(x==='tap')tone(900,1320,0.1,'square',0.07);else if(x==='early')tone(200,70,0.25,'sawtooth',0.1);else if(x==='finish')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.1));}
 
 function setPad(cls,main,sub){pad.className=cls;pad.innerHTML=main+(sub?`<small>${sub}</small>`:'');}
 
 function begin(){
-  times=[];runsEl.innerHTML='';next();
+  AC();times=[];runsEl.innerHTML='';next();
 }
 function next(){
   if(times.length>=5){finish();return;}
   state='wait';setPad('wait',t('준비...','Ready...'),t('초록색이 되면 탭!','Tap when green!'));
   const delay=900+Math.random()*2600;
-  timeoutId=setTimeout(()=>{state='ready';startT=performance.now();setPad('ready',t('지금 탭!','Tap now!'),'');},delay);
+  timeoutId=setTimeout(()=>{state='ready';startT=performance.now();setPad('ready',t('지금 탭!','Tap now!'),'');sfx('go');},delay);
 }
 function finish(){
   const avg=Math.round(times.reduce((a,b)=>a+b,0)/times.length);
   const bestRun=Math.min(...times);
   if(!best||bestRun<best){best=bestRun;localStorage.setItem('reaction_best',best);}
-  bestEl.textContent=best+'ms';avgEl.textContent=avg+'ms';
-  state='idle';setPad('result',t(`완료! 평균 ${avg}ms`,`Done! Avg ${avg}ms`),t('탭하여 다시 측정','Tap to test again'));
+  bestEl.textContent=best+'ms';avgEl.textContent=avg+'ms';sfx('finish');
+  const rating=avg<250?t('⚡ 번개 같아요!','⚡ Lightning!'):avg<350?t('👍 훌륭해요!','👍 Great!'):avg<450?t('🙂 평균이에요','🙂 Average'):t('🐢 조금 느려요','🐢 A bit slow');
+  state='idle';setPad('result',t(`완료! 평균 ${avg}ms`,`Done! Avg ${avg}ms`),rating+' · '+t('탭하여 다시','Tap to retry'));
 }
 function tap(){
   if(state==='idle'||state==='result'){begin();return;}
   if(state==='wait'){ // too early
-    clearTimeout(timeoutId);state='early';setPad('early',t('너무 빨라요! 😅','Too early! 😅'),t('탭하여 계속','Tap to continue'));
+    clearTimeout(timeoutId);state='early';setPad('early',t('너무 빨라요! 😅','Too early! 😅'),t('탭하여 계속','Tap to continue'));sfx('early');
     state='idle';return;
   }
   if(state==='ready'){
+    sfx('tap');
     const t=Math.round(performance.now()-startT);
     times.push(t);lastEl.textContent=t+'ms';
     const s=document.createElement('span');s.textContent=`#${times.length}: ${t}ms`;runsEl.appendChild(s);

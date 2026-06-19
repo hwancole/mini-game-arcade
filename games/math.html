@@ -70,6 +70,10 @@ const scoreEl=document.getElementById('score'),comboEl=document.getElementById('
 const qEl=document.getElementById('q'),ansEl=document.getElementById('answers'),timeFill=document.getElementById('timefill');
 let diff='easy',score,combo,correct,answer,timeLeft,maxTime,running,lastTick;
 let best=parseInt(localStorage.getItem('math_best')||'0');bestEl.textContent=best;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x,combo){if(x==='correct')tone(500+Math.min(combo,10)*55,760+Math.min(combo,10)*55,0.1,'square',0.07);else if(x==='wrong')tone(220,80,0.2,'sawtooth',0.09);else if(x==='end')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.1));}
 document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');diff=m.dataset.d;});
 
 function genQ(){
@@ -95,17 +99,20 @@ function newQuestion(){
 function choose(v,btn){
   if(!running)return;
   if(v===answer){
+    sfx('correct',combo);
     btn.classList.add('correct');score+=10+combo*2;combo++;correct++;
     timeLeft=Math.min(maxTime,timeLeft+0.6);
     scoreEl.textContent=score;comboEl.textContent=combo;correctEl.textContent=correct;
     setTimeout(newQuestion,120);
   } else {
+    sfx('wrong');
     btn.classList.add('wrong');combo=0;comboEl.textContent=0;timeLeft=Math.max(0,timeLeft-1.5);
     [...ansEl.children].forEach(b=>{if(+b.textContent===answer)b.classList.add('correct');});
     setTimeout(newQuestion,400);
   }
 }
 function start(){
+  AC();
   score=0;combo=0;correct=0;maxTime=diff==='hard'?6:diff==='normal'?7:9;timeLeft=maxTime;running=true;lastTick=performance.now();
   scoreEl.textContent=0;comboEl.textContent=0;correctEl.textContent=0;
   document.getElementById('startScreen').classList.add('hidden');
@@ -117,10 +124,11 @@ function tick(t){
   const dt=(t-lastTick)/1000;lastTick=t;timeLeft-=dt;
   if(timeLeft<=0){timeLeft=0;return end();}
   timeFill.style.width=(timeLeft/maxTime*100)+'%';
+  timeFill.style.background=timeLeft<maxTime*0.25?'#ff5f6d':'linear-gradient(90deg,#ffd35f,#ff8f3f)';
   requestAnimationFrame(tick);
 }
 function end(){
-  running=false;timeFill.style.width='0%';
+  running=false;sfx('end');timeFill.style.width='0%';
   if(score>best){best=score;localStorage.setItem('math_best',best);bestEl.textContent=best;}
   document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 정답 ${correct}개<br>최고: ${best}`,`Score: <b>${score}</b> · ${correct} correct<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
