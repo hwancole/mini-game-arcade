@@ -14,7 +14,11 @@
   .captured{display:flex;gap:1px;min-height:24px;font-size:1.3rem;width:min(94vw,520px);flex-wrap:wrap;line-height:1}
   #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);
     width:min(94vw,520px);aspect-ratio:1;
-    border:3px solid #5a4632;border-radius:4px;touch-action:manipulation;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+    border:3px solid #5a4632;border-radius:4px;touch-action:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #board.dragging{cursor:grabbing}
+  .dragghost{position:fixed;pointer-events:none;z-index:30;transform:translate(-50%,-50%);font-size:min(9vw,50px);line-height:1}
+  .dragghost.w{color:#fff;text-shadow:0 1px 2px #000,0 0 2px #000}
+  .dragghost.b{color:#1a1a1a;text-shadow:0 1px 1px rgba(255,255,255,.4)}
   .sq{display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;overflow:hidden;
     min-width:0;min-height:0;font-size:min(8.5vw,46px);line-height:1}
   .sq.light{background:#ecd9b6}.sq.dark{background:#b07d4f}
@@ -70,7 +74,7 @@
   <button class="btn alt" id="menuBtn">⚙️ 모드</button>
 </div>
 <div id="moves"></div>
-<p class="hint" data-ko="기물을 탭하면 이동 가능 칸 표시 · 💡힌트로 추천 수 확인 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원" data-en="Tap a piece to see its legal moves · 💡Hint suggests a move · the +number by captures shows material lead · king's square turns red in check · castling, en passant & promotion supported">기물을 탭하면 이동 가능 칸 표시 · 💡힌트로 추천 수 확인 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 모두 지원</p>
+<p class="hint" data-ko="기물을 탭(클릭)하거나 끌어서(드래그) 이동 · 💡힌트로 추천 수 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 지원" data-en="Tap (click) or drag a piece to move · 💡Hint suggests a move · the +number by captures shows material lead · king's square turns red in check · castling, en passant & promotion supported">기물을 탭(클릭)하거나 끌어서(드래그) 이동 · 💡힌트로 추천 수 · 잡은 기물 옆 +숫자는 기물 우세 · 체크 시 킹 칸 빨강 · 캐슬링·앙파상·승급 지원</p>
 
 <div class="overlay" id="startScreen">
   <h2 data-ko="♟️ 체스" data-en="♟️ Chess">♟️ 체스</h2>
@@ -264,6 +268,7 @@ function renderMoves(){
 
 // ---- 입력 ----
 function onSquare(i){
+  if(suppressClick){suppressClick=false;return;}
   if(state!=='play'||thinking)return;
   if(mode==='ai'&&game.turn()!==mySide)return;
   const [r,c]=cellToRC(i), sqn=sqName(r,c), p=game.get(sqn);
@@ -307,6 +312,41 @@ function applyMove(m){
   if(checkEnd())return;
   if(mode==='ai'&&game.turn()!==mySide) setTimeout(aiMove,260);
 }
+
+// ---- 드래그 앤 드롭 입력 (탭-탭과 병행) ----
+let dragFrom=null, dragGhost=null, dragMoved=false, dpx=0, dpy=0, suppressClick=false;
+function sqFromPoint(x,y){
+  const r=boardEl.getBoundingClientRect(); const cs=r.width/8;
+  const cx=Math.floor((x-r.left)/cs), cy=Math.floor((y-r.top)/cs);
+  if(cx<0||cx>7||cy<0||cy>7)return null;
+  const [rr,cc]=cellToRC(cy*8+cx); return sqName(rr,cc);
+}
+function startGhost(sqn){ const pc=game.get(sqn); if(!pc)return;
+  dragGhost=document.createElement('div'); dragGhost.className='dragghost pc '+pc.color; dragGhost.textContent=GLYPH[pc.color][pc.type];
+  document.body.appendChild(dragGhost); boardEl.classList.add('dragging'); }
+function endGhost(){ if(dragGhost){dragGhost.remove();dragGhost=null;} boardEl.classList.remove('dragging'); }
+boardEl.addEventListener('pointerdown',e=>{
+  if(state!=='play'||thinking||(mode==='ai'&&game.turn()!==mySide))return;
+  const sqn=sqFromPoint(e.clientX,e.clientY); if(!sqn)return;
+  const p=game.get(sqn);
+  if(p&&p.color===game.turn()){ dragFrom=sqn; dragMoved=false; dpx=e.clientX; dpy=e.clientY; }
+});
+// move/up은 window에서 처리(보드 밖으로 끌어도 안전, 포인터 캡처 미사용으로 탭 클릭 보존)
+window.addEventListener('pointermove',e=>{
+  if(!dragFrom)return;
+  if(!dragMoved){ if(Math.hypot(e.clientX-dpx,e.clientY-dpy)<6)return; dragMoved=true; selectSquare(dragFrom); startGhost(dragFrom); }
+  if(dragGhost){ e.preventDefault(); dragGhost.style.left=e.clientX+'px'; dragGhost.style.top=e.clientY+'px'; }
+});
+window.addEventListener('pointerup',e=>{
+  if(!dragFrom)return; const from=dragFrom, moved=dragMoved; dragFrom=null; endGhost();
+  if(!moved)return; // 단순 탭 → 기존 click(onSquare) 핸들러가 처리
+  suppressClick=true; setTimeout(()=>suppressClick=false,60); // 드래그 직후 합성 click 무시
+  const to=sqFromPoint(e.clientX,e.clientY);
+  if(to&&to!==from&&legalForSel.includes(to)) doMove(from,to);
+  else { sel=null; legalForSel=[]; render(); } // 빗나간 드롭 → 선택 해제
+});
+window.addEventListener('pointercancel',()=>{dragFrom=null;endGhost();});
+
 function checkEnd(){
   if(!game.game_over())return false;
   state='over';
