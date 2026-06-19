@@ -64,6 +64,10 @@
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),statusEl=document.getElementById('status');
 let R=5,C=5,PAD=30,GAP,h,v,boxes,turn,mode='ai',state,s1,s2,thinking=false;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,vv,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(vv||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='line')tone(360,460,0.05,'square',0.06);else if(x==='box'){tone(660,990,0.1,'square',0.08);}else if(x==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));else if(x==='lose')[392,294,196].forEach((f,i)=>tone(f,f,0.18,'sawtooth',0.09,i*0.12));else if(x==='draw')tone(330,250,0.2,'sine',0.07);}
 
 document.querySelectorAll('#modeOpts .opt').forEach(o=>o.onclick=()=>{selOne('#modeOpts',o);mode=o.dataset.mode;
   document.getElementById('p2lbl').textContent=mode==='ai'?'AI':'P2';});
@@ -74,6 +78,7 @@ document.getElementById('menuBtn').onclick=showMenu;document.getElementById('end
 function showMenu(){state='menu';document.getElementById('startScreen').classList.remove('hidden');document.getElementById('endScreen').classList.add('hidden');showRecord();}
 
 function start(){
+  AC();
   GAP=(cv.width-PAD*2)/C;
   h=Array.from({length:R+1},()=>Array(C).fill(0)); // 가로변
   v=Array.from({length:R},()=>Array(C+1).fill(0)); // 세로변
@@ -99,6 +104,7 @@ function move(type,r,c){
   if((type==='h'?h[r][c]:v[r][c]))return;
   const done=setEdge(type,r,c,turn);
   if(done){turn===1?s1+=done:s2+=done;updateScore();}
+  sfx(done?'box':'line');
   draw();
   if(drawnEdges()===totalEdges()){return endGame();}
   if(!done){turn=3-turn;}
@@ -112,6 +118,7 @@ function aiTurn(){
     while(turn===2&&state==='play'&&guard++<200){
       const mv=aiPick(); if(!mv)break;
       const done=setEdge(mv.type,mv.r,mv.c,2); if(done)s2+=done;
+      sfx(done?'box':'line');
       if(drawnEdges()===totalEdges()){thinking=false;updateScore();draw();return endGame();}
       if(!done){turn=1;break;}
     }
@@ -179,10 +186,10 @@ function loadRec(){try{return JSON.parse(localStorage.getItem('dots_record'))||{
 function showRecord(){const r=loadRec();document.getElementById('record').textContent=t('📊 AI전 전적','📊 vs AI')+`: ${r.w}${t('승','W')} ${r.d}${t('무','D')} ${r.l}${t('패','L')}`;}
 function endGame(){
   state='over';let title;
-  if(s1===s2)title=t('무승부!','Draw!');
-  else if(mode==='ai'){const youWin=s1>s2;title=youWin?t('🏆 승리!','🏆 You Win!'):t('😢 패배','😢 You Lose');
+  if(s1===s2){title=t('무승부!','Draw!');sfx('draw');}
+  else if(mode==='ai'){const youWin=s1>s2;title=youWin?t('🏆 승리!','🏆 You Win!'):t('😢 패배','😢 You Lose');sfx(youWin?'win':'lose');
     const r=loadRec();if(youWin)r.w++;else r.l++;localStorage.setItem('dots_record',JSON.stringify(r));}
-  else title=(s1>s2?'🔵 P1 '+t('승리!','wins!'):'🔴 P2 '+t('승리!','wins!'));
+  else {title=(s1>s2?'🔵 P1 '+t('승리!','wins!'):'🔴 P2 '+t('승리!','wins!'));sfx('win');}
   document.getElementById('endTitle').textContent=title;
   document.getElementById('endSub').textContent=`🔵 ${s1}  vs  🔴 ${s2}`;
   document.getElementById('endScreen').classList.remove('hidden');showRecord();

@@ -52,10 +52,15 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.h
 const startScreen=document.getElementById('startScreen'),endScreen=document.getElementById('endScreen');
 let mode='ai',left,right,ball,state,sl,sr,keys={};
 const PW=14,PH=88,WIN=7;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='hit')tone(440,560,0.05,'square',0.07);else if(x==='wall')tone(300,300,0.04,'square',0.05);else if(x==='score')tone(220,150,0.14,'sawtooth',0.08);else if(x==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.m;});
 
 function resetBall(dir){ball={x:W/2,y:H/2,vx:(dir||(Math.random()<.5?1:-1))*5,vy:(Math.random()*2-1)*4,r:9,spin:0};}
 function start(){
+  AC();
   left={x:24,y:H/2-PH/2,vy:0};right={x:W-24-PW,y:H/2-PH/2,vy:0};
   sl=0;sr=0;resetBall();state='play';
   startScreen.classList.add('hidden');endScreen.classList.add('hidden');
@@ -91,23 +96,23 @@ function update(){
   clampPaddle(left);clampPaddle(right);
   // ball
   ball.x+=ball.vx;ball.y+=ball.vy;
-  if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-1;}
-  if(ball.y>H-ball.r){ball.y=H-ball.r;ball.vy*=-1;}
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-1;sfx('wall');}
+  if(ball.y>H-ball.r){ball.y=H-ball.r;ball.vy*=-1;sfx('wall');}
   // paddle collisions
   if(ball.vx<0&&ball.x-ball.r<left.x+PW&&ball.x>left.x&&ball.y>left.y&&ball.y<left.y+PH){
-    ball.x=left.x+PW+ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(left.y+PH/2))/(PH/2))*4;
+    ball.x=left.x+PW+ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(left.y+PH/2))/(PH/2))*4;sfx('hit');
   }
   if(ball.vx>0&&ball.x+ball.r>right.x&&ball.x<right.x+PW&&ball.y>right.y&&ball.y<right.y+PH){
-    ball.x=right.x-ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(right.y+PH/2))/(PH/2))*4;
+    ball.x=right.x-ball.r;ball.vx*=-1.06;ball.vy+=((ball.y-(right.y+PH/2))/(PH/2))*4;sfx('hit');
   }
   ball.vx=Math.max(-13,Math.min(13,ball.vx));ball.vy=Math.max(-10,Math.min(10,ball.vy));
   // score
-  if(ball.x<-20){sr++;score();resetBall(1);}
-  else if(ball.x>W+20){sl++;score();resetBall(-1);}
+  if(ball.x<-20){sr++;sfx('score');score();resetBall(1);}
+  else if(ball.x>W+20){sl++;sfx('score');score();resetBall(-1);}
 }
 function score(){
   if(sl>=WIN||sr>=WIN){
-    state='over';
+    state='over'; sfx('win');
     const p1=sl>=WIN;
     document.getElementById('endTitle').textContent=(mode==='ai'?(p1?t('🏆 승리!','🏆 You Win!'):t('🤖 AI 승리','🤖 AI Wins')):(p1?t('🟢 왼쪽 승리!','🟢 Left Wins!'):t('🔵 오른쪽 승리!','🔵 Right Wins!')));
     endScreen.classList.remove('hidden');
