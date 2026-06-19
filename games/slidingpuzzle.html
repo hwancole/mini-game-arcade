@@ -48,6 +48,10 @@
 const boardEl=document.getElementById('board');
 const movesEl=document.getElementById('moves'),timeEl=document.getElementById('time'),bestEl=document.getElementById('best');
 let N=3,tiles,blank,moves,size,gap=8,started,timer,timerIv;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='slide')tone(320,440,0.05,'square',0.05);else if(x==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 
 document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;newGame();});
 document.getElementById('shuffleBtn').onclick=newGame;
@@ -101,13 +105,14 @@ function move(i){
   const r=Math.floor(i/N),c=i%N, br=Math.floor(blank/N),bc=blank%N;
   if((Math.abs(r-br)===1&&c===bc)||(Math.abs(c-bc)===1&&r===br)){
     if(!started){started=true;timerIv=setInterval(()=>{timer++;timeEl.textContent=timer;},1000);}
+    AC();sfx('slide');
     [tiles[i],tiles[blank]]=[tiles[blank],tiles[i]];blank=i;
     moves++;movesEl.textContent=moves;render();
     if(isSolved())win();
   }
 }
 function win(){
-  clearInterval(timerIv);
+  clearInterval(timerIv); sfx('win');
   const key='slide_best_'+N,prev=localStorage.getItem(key);let rec='';
   if(!prev||moves<+prev){localStorage.setItem(key,moves);rec=t(' (신기록!)',' (New record!)');}
   bestEl.textContent=localStorage.getItem(key);

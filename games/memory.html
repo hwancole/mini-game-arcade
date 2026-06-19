@@ -59,6 +59,10 @@ const EMOJIS=['🍎','🍌','🍓','🍇','🍑','🍉','🥝','🍒','🥑','�
 const boardEl=document.getElementById('board');
 const movesEl=document.getElementById('moves'),pairsEl=document.getElementById('pairs'),timeEl=document.getElementById('time');
 let count=12,cards,first,second,lock,moves,pairs,total,timer,timerIv,started;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='flip')tone(480,640,0.05,'square',0.05);else if(x==='match'){tone(700,1000,0.1,'square',0.07);tone(1000,1400,0.1,'square',0.06,0.08);}else if(x==='nomatch')tone(260,150,0.16,'sawtooth',0.06);else if(x==='win')[523,659,784,1047,1319].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 
 document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.diff').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');count=+b.dataset.c;newGame();});
@@ -90,11 +94,12 @@ function startTimer(){if(started)return;started=true;timerIv=setInterval(()=>{ti
 
 function flip(card){
   if(lock||card.classList.contains('flipped')||card.classList.contains('matched'))return;
-  startTimer();
-  card.classList.add('flipped');
+  startTimer();AC();
+  card.classList.add('flipped');sfx('flip');
   if(!first){first=card;return;}
   second=card;lock=true;moves++;movesEl.textContent=moves;
   if(first.dataset.em===second.dataset.em){
+    sfx('match');
     setTimeout(()=>{
       first.classList.add('matched');second.classList.add('matched');
       pairs++;pairsEl.textContent=pairs+'/'+total;
@@ -102,11 +107,12 @@ function flip(card){
       if(pairs===total)win();
     },400);
   } else {
+    sfx('nomatch');
     setTimeout(()=>{first.classList.remove('flipped');second.classList.remove('flipped');first=second=null;lock=false;},800);
   }
 }
 function win(){
-  clearInterval(timerIv);
+  clearInterval(timerIv); sfx('win');
   const key='memory_best_'+count;const prev=localStorage.getItem(key);
   let rec='';const sc=moves;
   if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=t('<br>🏆 최소 시도 신기록!','<br>🏆 New fewest-moves record!');}

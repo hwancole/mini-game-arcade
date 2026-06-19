@@ -44,6 +44,10 @@
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const movesEl=document.getElementById('moves'),timeEl=document.getElementById('time'),bestEl=document.getElementById('best');
 let N=10,cells,player,moves,started,timer,timerIv,cellPx,won,trail;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='step')tone(380,470,0.04,'square',0.05);else if(x==='bump')tone(170,110,0.09,'sawtooth',0.06);else if(x==='win')[523,659,784,1047,1319].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 
 document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;newGame();});
 document.getElementById('newBtn').onclick=newGame;
@@ -76,7 +80,9 @@ function newGame(){
 function tryMove(dx,dy){
   if(won)return;
   const c=cells[player.y][player.x];
-  if(dx===1&&c.e)return;if(dx===-1&&c.w)return;if(dy===1&&c.s)return;if(dy===-1&&c.n)return;
+  const blocked=(dx===1&&c.e)||(dx===-1&&c.w)||(dy===1&&c.s)||(dy===-1&&c.n);
+  if(blocked){AC();sfx('bump');return;}
+  AC();sfx('step');
   player.x+=dx;player.y+=dy;moves++;movesEl.textContent=moves;
   trail.push({x:player.x,y:player.y});
   if(!started){started=true;timerIv=setInterval(()=>{timer++;timeEl.textContent=timer;},1000);}
@@ -84,7 +90,7 @@ function tryMove(dx,dy){
   draw();
 }
 function win(){
-  won=true;clearInterval(timerIv);
+  won=true;clearInterval(timerIv); sfx('win');
   const key='maze_best_'+N,prev=localStorage.getItem(key);let rec='';
   const sc=timer;
   if(!prev||sc<+prev){localStorage.setItem(key,sc);rec=t(' (신기록!)',' (New Record!)');}
