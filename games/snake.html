@@ -54,9 +54,13 @@
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const GRID=28,CELL=cv.width/GRID;
-let snake,dir,nextDir,food,score,best,state,speed,moveTimer,grow,mode='wall';
+let snake,dir,nextDir,food,score,best,state,speed,moveTimer,grow,mode='wall',parts=[],eatFx=0,frame=0;
 const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best');
 best=parseInt(localStorage.getItem('snake_best')||'0');bestEl.textContent=best;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.07,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(t){if(t==='eat')tone(560,920,0.1,'square',0.07);else if(t==='die')[440,330,220,150].forEach((f,i)=>tone(f,f,0.16,'sawtooth',0.1,i*0.1));}
 
 document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
   document.querySelectorAll('.mode').forEach(x=>x.classList.remove('sel'));m.classList.add('sel');mode=m.dataset.m;});
@@ -66,8 +70,9 @@ function placeFood(){
   while(snake.some(s=>s.x===food.x&&s.y===food.y));
 }
 function start(){
+  AC();
   snake=[{x:14,y:14},{x:13,y:14},{x:12,y:14}];
-  dir={x:1,y:0};nextDir={x:1,y:0};score=0;speed=130;grow=0;moveTimer=0;
+  dir={x:1,y:0};nextDir={x:1,y:0};score=0;speed=130;grow=0;moveTimer=0;parts=[];eatFx=0;
   scoreEl.textContent=0;placeFood();state='play';
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -93,13 +98,16 @@ function step(){
   if(snake.some(s=>s.x===head.x&&s.y===head.y))return gameOver();
   snake.unshift(head);
   if(head.x===food.x&&head.y===food.y){
-    score+=10;scoreEl.textContent=score;grow+=2;placeFood();
+    score+=10;scoreEl.textContent=score;grow+=2;
+    sfx('eat');eatFx=8;
+    for(let i=0;i<8;i++){const a=Math.random()*7;parts.push({x:food.x*CELL+CELL/2,y:food.y*CELL+CELL/2,vx:Math.cos(a)*2,vy:Math.sin(a)*2,life:18});}
+    placeFood();
     if(speed>60)speed-=2;
   }
   if(grow>0)grow--;else snake.pop();
 }
 function gameOver(){
-  state='over';
+  state='over'; sfx('die');
   if(score>best){best=score;localStorage.setItem('snake_best',best);bestEl.textContent=best;}
   document.getElementById('endStats').innerHTML=t(`점수: <b>${score}</b> · 길이: ${snake.length}<br>최고: ${best}`,`Score: <b>${score}</b> · Length: ${snake.length}<br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
@@ -110,9 +118,13 @@ function draw(){
   // subtle grid
   ctx.strokeStyle='rgba(255,255,255,.03)';
   for(let i=0;i<=GRID;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,cv.height);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(cv.width,i*CELL);ctx.stroke();}
-  // food
-  ctx.fillStyle='#ff5f6d';ctx.beginPath();ctx.arc(food.x*CELL+CELL/2,food.y*CELL+CELL/2,CELL/2-2,0,7);ctx.fill();
+  // food (맥동)
+  const fp=1+0.16*Math.sin(frame*0.2);
+  ctx.fillStyle='#ff5f6d';ctx.beginPath();ctx.arc(food.x*CELL+CELL/2,food.y*CELL+CELL/2,(CELL/2-2)*fp,0,7);ctx.fill();
   ctx.fillStyle='#5fffac';ctx.fillRect(food.x*CELL+CELL/2-1,food.y*CELL+2,2,4);
+  // 먹을 때 파티클
+  for(const p of parts){ctx.globalAlpha=Math.min(1,p.life/18);ctx.fillStyle='#ff9b9b';ctx.fillRect(p.x-2,p.y-2,4,4);}
+  ctx.globalAlpha=1;
   // snake
   for(let i=snake.length-1;i>=0;i--){
     const s=snake[i],t=i/snake.length;
@@ -133,6 +145,9 @@ function loop(t){
   if(state==='play'){
     moveTimer+=t-last;
     if(moveTimer>=speed){moveTimer=0;step();}
+    frame++;
+    for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.life--;} parts=parts.filter(p=>p.life>0);
+    if(eatFx>0)eatFx--;
     draw();
   }
   last=t;

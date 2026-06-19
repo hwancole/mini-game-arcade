@@ -43,19 +43,26 @@
 <script>
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height,hud=document.getElementById('hud');
 const GRAV=0.32, JUMP=-11.5, PW=46, PH=46;
-let player, plats, score, best, state, keys={}, touchDir=0;
+let player, plats, score, best, state, keys={}, touchDir=0, parts=[], squash=0;
 best=parseInt(localStorage.getItem('doodle_best')||'0');
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(t){if(t==='bounce')tone(300,520,0.07,'square',0.06);else if(t==='spring')tone(420,950,0.16,'square',0.08);else if(t==='fall')[420,320,220,150].forEach((f,i)=>tone(f,f,0.16,'sawtooth',0.1,i*0.1));}
 
 function makePlat(y){
-  const type=Math.random()<(score>1500?0.28:0.15)?'move':'normal';
+  const r=Math.random(), moveP=score>1500?0.28:0.15;
+  let type='normal';
+  if(r<moveP)type='move'; else if(r<moveP+0.12)type='spring'; // 스프링=초고점프
   const w=64;
   return {x:Math.random()*(W-w),y,w,type,dir:Math.random()<.5?1:-1,vx:1.4};
 }
 function start(){
+  AC();
   player={x:W/2-PW/2,y:H-120,vy:0,face:1};
   plats=[]; for(let i=0;i<9;i++)plats.push(makePlat(H-40-i*70));
   plats[0].x=W/2-32;plats[0].type='normal';
-  score=0;state='play';
+  score=0;state='play';parts=[];squash=0;
   document.getElementById('startScreen').classList.add('hidden');document.getElementById('endScreen').classList.add('hidden');
 }
 document.getElementById('startBtn').onclick=start;
@@ -78,12 +85,18 @@ function update(){
   if(player.vy>0){
     for(const p of plats){
       if(player.x+PW-8>p.x&&player.x+8<p.x+p.w&&player.y+PH>p.y&&player.y+PH<p.y+18){
-        player.vy=JUMP;
+        if(p.type==='spring'){player.vy=JUMP*1.7;sfx('spring');}
+        else{player.vy=JUMP;sfx('bounce');}
+        squash=8;
+        for(let i=0;i<6;i++){const a=Math.random()*7;parts.push({x:player.x+PW/2,y:p.y,vx:Math.cos(a)*2,vy:Math.sin(a)*1.5,life:16});}
+        break;
       }
     }
   }
   // 움직이는 발판
   for(const p of plats)if(p.type==='move'){p.x+=p.dir*p.vx;if(p.x<0||p.x+p.w>W)p.dir*=-1;}
+  for(const pp of parts){pp.x+=pp.vx;pp.y+=pp.vy;pp.vy+=0.2;pp.life--;} parts=parts.filter(pp=>pp.life>0);
+  if(squash>0)squash--;
   // 카메라 스크롤
   if(player.y<H*0.42){const dy=H*0.42-player.y;player.y=H*0.42;score+=dy;
     for(const p of plats)p.y+=dy;
@@ -94,7 +107,7 @@ function update(){
   hud.textContent='🏆 '+Math.floor(score/10)+'  ('+t('최고','Best')+' '+Math.floor(best/10)+')';
 }
 function gameOver(){
-  state='over';
+  state='over'; sfx('fall');
   if(score>best){best=Math.floor(score);localStorage.setItem('doodle_best',best);}
   document.getElementById('endStats').innerHTML=t(`높이: <b>${Math.floor(score/10)}</b><br>최고: ${Math.floor(best/10)}`,`Height: <b>${Math.floor(score/10)}</b><br>Best: ${Math.floor(best/10)}`);
   document.getElementById('endScreen').classList.remove('hidden');
@@ -104,12 +117,15 @@ function draw(){
   ctx.fillStyle='#163a28';ctx.fillRect(0,0,W,H);
   // platforms
   for(const p of plats){
-    ctx.fillStyle=p.type==='move'?'#5fd0ff':'#7ad17a';
+    ctx.fillStyle=p.type==='move'?'#5fd0ff':p.type==='spring'?'#ffd35f':'#7ad17a';
     roundRect(p.x,p.y,p.w,12,6);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,.25)';ctx.fillRect(p.x+3,p.y+2,p.w-6,3);
+    if(p.type==='spring'){ctx.strokeStyle='#b8860b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x+p.w/2-6,p.y);ctx.lineTo(p.x+p.w/2-6,p.y-8);ctx.lineTo(p.x+p.w/2+6,p.y-4);ctx.lineTo(p.x+p.w/2+6,p.y);ctx.stroke();}
   }
-  // player (green creature)
+  // player (green creature) — 점프 시 스쿼시
   const px=player.x,py=player.y;
+  ctx.save();
+  if(squash>0){const sf=squash/8;ctx.translate(px+PW/2,py+PH);ctx.scale(1+sf*0.25,1-sf*0.3);ctx.translate(-(px+PW/2),-(py+PH));}
   ctx.fillStyle='#5fffac';roundRect(px+6,py+10,PW-12,PH-14,10);ctx.fill();
   ctx.fillStyle='#5fffac';ctx.beginPath();ctx.ellipse(px+PW/2,py+14,PW/2-6,10,0,0,7);ctx.fill();
   // eyes
@@ -117,6 +133,10 @@ function draw(){
   ctx.fillStyle='#000';ctx.beginPath();ctx.arc(px+PW/2-6+player.face*6,py+12,2.4,0,7);ctx.arc(px+PW/2+8+player.face*6,py+12,2.4,0,7);ctx.fill();
   // legs/feet
   ctx.fillStyle='#3fbf7f';ctx.fillRect(px+10,py+PH-6,8,6);ctx.fillRect(px+PW-18,py+PH-6,8,6);
+  ctx.restore();
+  // 점프 파티클
+  for(const pp of parts){ctx.globalAlpha=Math.min(1,pp.life/16);ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(pp.x-2,pp.y-2,4,4);}
+  ctx.globalAlpha=1;
 }
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 
