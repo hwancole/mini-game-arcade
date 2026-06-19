@@ -45,20 +45,25 @@
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
 const hud=document.getElementById('hud');
 const GROUND=H-40;
-let dino,obstacles,clouds,speed,score,best,state,spawnT,night;
+let dino,obstacles,clouds,speed,score,best,state,spawnT,night,shake=0,parts=[],milestone=0;
 best=parseInt(localStorage.getItem('dino_best')||'0');
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.07,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(t){if(t==='jump')tone(480,760,0.12,'square',0.06);else if(t==='duck')tone(300,180,0.06,'square',0.05);else if(t==='score')tone(900,1300,0.1,'square',0.07);else if(t==='over'){[440,330,220,150].forEach((f,i)=>tone(f,f,0.16,'sawtooth',0.1,i*0.1));}}
 
 function start(){
+  AC();
   dino={x:60,y:GROUND,vy:0,w:44,h:48,duck:false,onGround:true,leg:0};
-  obstacles=[];clouds=[];speed=6;score=0;spawnT=40;night=0;state='play';
+  obstacles=[];clouds=[];speed=6;score=0;spawnT=40;night=0;state='play';shake=0;parts=[];milestone=0;
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
 }
 document.getElementById('startBtn').onclick=start;
 document.getElementById('restartBtn').onclick=start;
 
-function jump(){if(state!=='play')return;if(dino.onGround){dino.vy=-14;dino.onGround=false;}}
-function setDuck(v){if(dino)dino.duck=v&&dino.onGround?true:(v&&!dino.onGround?true:false);if(dino)dino.duck=v;}
+function jump(){if(state!=='play')return;if(dino.onGround){dino.vy=-14;dino.onGround=false;sfx('jump');}}
+function setDuck(v){if(dino)dino.duck=v;}
 
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
@@ -84,9 +89,10 @@ function spawn(){
 }
 function update(){
   speed+=0.0025;score+=speed*0.05;
+  if(Math.floor(score/100)>milestone){milestone=Math.floor(score/100);sfx('score');}
   night=(Math.floor(score/1000)%2);
-  // dino physics
-  dino.vy+=0.8;dino.y+=dino.vy;
+  // dino physics (공중에서 숙이면 빠르게 낙하)
+  dino.vy+=0.8; if(dino.duck&&!dino.onGround)dino.vy+=0.7; dino.y+=dino.vy;
   if(dino.y>=GROUND){dino.y=GROUND;dino.vy=0;dino.onGround=true;}else dino.onGround=false;
   dino.h=(dino.duck&&dino.onGround)?28:48;
   dino.leg=(dino.leg+speed*0.3)%2;
@@ -106,10 +112,14 @@ function update(){
       return gameOver();
     }
   }
+  for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.vy+=0.5;p.life--;}
+  parts=parts.filter(p=>p.life>0);
+  if(shake>0.3)shake*=0.85;else shake=0;
   hud.textContent='🏃 '+Math.floor(score)+'  🏆 '+best;
 }
 function gameOver(){
-  state='over';
+  state='over'; sfx('over'); shake=14;
+  for(let i=0;i<16;i++){const a=Math.random()*7;parts.push({x:dino.x+dino.w/2,y:dino.y-dino.h/2,vx:Math.cos(a)*(1+Math.random()*3),vy:Math.sin(a)*(1+Math.random()*3)-2,life:40,color:night?'#9fe07a':'#555'});}
   if(score>best){best=Math.floor(score);localStorage.setItem('dino_best',best);}
   document.getElementById('endStats').innerHTML=t(`거리: <b>${Math.floor(score)}</b><br>최고: ${best}`,`Distance: <b>${Math.floor(score)}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
@@ -118,6 +128,8 @@ function gameOver(){
 function draw(){
   const bg=night?'#222238':'#f7f7fa', fg=night?'#cfd':'#535366';
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.save();
+  if(shake>0.3)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
   // clouds
   ctx.fillStyle=night?'#3a3a55':'#dde';
   for(const c of clouds){ctx.beginPath();ctx.arc(c.x,c.y,12,0,7);ctx.arc(c.x+14,c.y+4,16,0,7);ctx.arc(c.x+32,c.y,12,0,7);ctx.fill();}
@@ -153,6 +165,10 @@ function draw(){
     ctx.fillRect(dx+18,dy+dh-14,7,14-(lg?4:0));
     ctx.fillStyle=bg;ctx.fillRect(dx+dino.w-12,dy+1,4,4); // eye
   }
+  // 충돌 파편
+  for(const p of parts){ctx.globalAlpha=Math.min(1,p.life/40);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,5,5);}
+  ctx.globalAlpha=1;
+  ctx.restore();
 }
 function loop(){if(state==='play'){update();}if(dino)draw();requestAnimationFrame(loop);}
 ctx.fillStyle='#f7f7fa';ctx.fillRect(0,0,W,H);

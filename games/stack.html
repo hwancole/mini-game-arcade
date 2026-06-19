@@ -44,14 +44,20 @@
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
 const hud=document.getElementById('hud');
 const BH=34; // block height
-let stack,cur,score,best,state,camY,combo,particles;
+let stack,cur,score,best,state,camY,combo,particles,shake=0,flash=0,rings=[],pops=[];
 best=parseInt(localStorage.getItem('stack_best')||'0');
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.07,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function nz(d,v){const a=AC();if(!a)return;const n=a.sampleRate*d|0,b=a.createBuffer(1,n,a.sampleRate),dd=b.getChannelData(0);for(let i=0;i<n;i++)dd[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=a.createBufferSource();s.buffer=b;const g=a.createGain();g.gain.value=v||0.1;s.connect(g);g.connect(a.destination);s.start();}
+function sfx(t,combo){if(t==='place')tone(300+Math.min(combo,12)*40,360+Math.min(combo,12)*40,0.08,'square',0.06);else if(t==='perfect'){tone(700,1050,0.12,'square',0.08);tone(950,1400,0.12,'square',0.07,0.08);}else if(t==='slice'){tone(220,90,0.1,'square',0.07);nz(0.08,0.07);}else if(t==='over')[330,247,180,130].forEach((f,i)=>tone(f,f,0.18,'sawtooth',0.1,i*0.1));}
 
 document.getElementById('startHint').innerHTML=t('좌우로 움직이는 블록을 탭/클릭으로 멈춰 정확히 쌓으세요.<br>빗나간 부분은 잘려나가고, 완벽하게 맞추면 보너스!','Tap/click to drop the moving block and stack it precisely.<br>Overhang is sliced off; a perfect hit earns a bonus!');
 function hue(i){return `hsl(${(i*18+180)%360} 65% 58%)`;}
 function start(){
+  AC();
   stack=[{x:W/2-90,w:180,y:H-BH}];
-  score=0;combo=0;camY=0;particles=[];
+  score=0;combo=0;camY=0;particles=[];shake=0;flash=0;rings=[];pops=[];
   spawn();state='play';
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -70,12 +76,14 @@ function place(){
   const top=stack[stack.length-1];
   const overlapL=Math.max(cur.x,top.x), overlapR=Math.min(cur.x+cur.w,top.x+top.w);
   const overlap=overlapR-overlapL;
-  if(overlap<=0){ return end(); }
+  if(overlap<=0){ spawnSlice(cur.x,cur.y,cur.w); shake=12; return end(); }
   const perfect=Math.abs(cur.x-top.x)<6;
   let nx,nw;
-  if(perfect){nx=top.x;nw=top.w;combo++;score+=2;}
-  else{ nx=overlapL;nw=overlap;combo=0;score+=1;
-    // sliced piece particles
+  if(perfect){nx=top.x;nw=top.w;combo++;score+=2; sfx('perfect'); flash=8;
+    rings.push({x:nx+nw/2,y:cur.y+BH/2,r:8,life:22});
+    pops.push({x:nx+nw/2,y:cur.y-4,txt:'PERFECT'+(combo>1?' x'+combo:''),life:40});
+  }
+  else{ nx=overlapL;nw=overlap;combo=0;score+=1; sfx('slice'); shake=Math.min(11,5+(cur.w-overlap)*0.06);
     const sliceX = cur.x<top.x ? cur.x : overlapR;
     spawnSlice(sliceX, cur.y, cur.x<top.x?overlapL-cur.x:cur.x+cur.w-overlapR);
   }
@@ -89,7 +97,7 @@ function spawnSlice(x,y,w){
   particles.push({x,y,w:Math.abs(w),h:BH,vy:1,vx:(Math.random()*2-1)*2,rot:0,vr:(Math.random()-.5)*0.2,life:60,color:hue(stack.length)});
 }
 function end(){
-  state='over';
+  state='over'; sfx('over');
   if(score>best){best=score;localStorage.setItem('stack_best',best);}
   document.getElementById('endStats').innerHTML=t(`높이: <b>${score}</b>층<br>최고: ${best}층`,`Height: <b>${score}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
@@ -108,12 +116,15 @@ function update(){
   }
   for(const p of particles){p.x+=p.vx;p.y+=p.vy;p.vy+=0.5;p.rot+=p.vr;p.life--;}
   particles=particles.filter(p=>p.life>0&&p.y<H+camY+100);
+  for(const r of rings){r.r+=4;r.life--;} rings=rings.filter(r=>r.life>0);
+  for(const pp of pops){pp.y-=0.7;pp.life--;} pops=pops.filter(pp=>pp.life>0);
+  if(shake>0.3)shake*=0.85;else shake=0; if(flash>0)flash--;
 }
 function draw(){
   ctx.clearRect(0,0,W,H);
   const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0a0e1a');g.addColorStop(1,'#16213e');
   ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(0,camY);
+  ctx.save();ctx.translate(shake>0.3?(Math.random()-.5)*shake:0, camY+(shake>0.3?(Math.random()-.5)*shake:0));
   // stack
   for(let i=0;i<stack.length;i++){const b=stack[i];
     ctx.fillStyle=hue(i);ctx.fillRect(b.x,b.y,b.w,BH-2);
@@ -126,7 +137,15 @@ function draw(){
   // particles
   for(const p of particles){ctx.save();ctx.translate(p.x+p.w/2,p.y+p.h/2);ctx.rotate(p.rot);ctx.globalAlpha=Math.min(1,p.life/30);ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h-2);ctx.restore();}
   ctx.globalAlpha=1;
+  // 퍼펙트 링
+  for(const r of rings){ctx.globalAlpha=Math.max(0,r.life/22*0.6);ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,7);ctx.stroke();}
+  ctx.globalAlpha=1;
+  // PERFECT 팝업
+  ctx.font='bold 20px sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffd35f';
+  for(const pp of pops){ctx.globalAlpha=Math.min(1,pp.life/40);ctx.fillText(pp.txt,pp.x,pp.y);}
+  ctx.globalAlpha=1;
   ctx.restore();
+  if(flash>0){ctx.fillStyle='rgba(255,255,255,'+(flash/8*0.25)+')';ctx.fillRect(0,0,W,H);}
 }
 function loop(){if(state==='play')update();if(stack)draw();requestAnimationFrame(loop);}
 ctx.fillStyle='#16213e';ctx.fillRect(0,0,W,H);
