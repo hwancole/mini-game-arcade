@@ -65,6 +65,11 @@ document.querySelectorAll('.diff').forEach(b=>b.onclick=()=>{
 });
 faceEl.onclick=newGame;
 
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function nz(d,v){const a=AC();if(!a)return;const n=a.sampleRate*d|0,b=a.createBuffer(1,n,a.sampleRate),dd=b.getChannelData(0);for(let i=0;i<n;i++)dd[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);const s=a.createBufferSource();s.buffer=b;const g=a.createGain();g.gain.value=v||0.12;s.connect(g);g.connect(a.destination);s.start();}
+function sfx(x){if(x==='reveal')tone(500,640,0.04,'square',0.05);else if(x==='flag')tone(700,920,0.06,'square',0.06);else if(x==='boom'){tone(150,40,0.3,'sawtooth',0.14);nz(0.25,0.14);}else if(x==='win')[523,659,784,1047,1319].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 function newGame(){
   const d=DIFFS[diff];rows=d.r;cols=d.c;mines=d.m;
   grid=Array.from({length:rows},()=>Array(cols).fill(0)); // -1 mine else count
@@ -117,14 +122,14 @@ function chord(r,c){
 function toggleFlag(r,c){
   if(opened[r][c]||state==='lost'||state==='won')return;
   if(firstClick)return;
-  flagged[r][c]=!flagged[r][c];
+  AC();flagged[r][c]=!flagged[r][c];sfx('flag');
   flagsLeft+=flagged[r][c]?-1:1;mineCountEl.textContent=flagsLeft;
 }
 
 let lastR=-1,lastC=-1;
 function lose(mr,mc){
   lastR=mr;lastC=mc; // highlight the mine that was clicked
-  state='lost';clearInterval(timerIv);faceEl.textContent='😵';
+  state='lost';sfx('boom');clearInterval(timerIv);faceEl.textContent='😵';
   msgEl.style.color='#ff5f6d';msgEl.textContent=t('💥 펑! 게임 오버','💥 Boom! Game Over');
   render();
 }
@@ -132,7 +137,7 @@ function checkWin(){
   let unopened=0;
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(!opened[r][c]&&grid[r][c]!==-1)unopened++;
   if(unopened===0){
-    state='won';clearInterval(timerIv);faceEl.textContent='😎';
+    state='won';sfx('win');clearInterval(timerIv);faceEl.textContent='😎';
     msgEl.style.color='#5fffbc';msgEl.textContent=t('🎉 클리어! '+timer+'초','🎉 Clear! '+timer+'s');
     flagsLeft=0;mineCountEl.textContent=0;
     saveBest();
@@ -161,10 +166,11 @@ function render(){
     d.oncontextmenu=e=>{e.preventDefault();toggleFlag(r,c);postAction();};
     d.onmousedown=e=>{
       if(state==='lost'||state==='won')return;
-      if(e.button===0){
+      if(e.button===0){ AC();
         if(flagMode && !opened[r][c]){toggleFlag(r,c);postAction();return;}
         if(opened[r][c]&&grid[r][c]>0)chord(r,c);
         else open(r,c);
+        if(state==='playing')sfx('reveal');
         postAction();
       }
     };

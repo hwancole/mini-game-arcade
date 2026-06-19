@@ -65,6 +65,10 @@
 <script>
 let N=5, sol, cell, rowClues, colClues, fillMode=true, timer=0, timerIv, started, errs;
 const puzzleEl=document.getElementById('puzzle');
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='fill')tone(420,540,0.05,'square',0.06);else if(x==='cross')tone(320,320,0.04,'square',0.04);else if(x==='erase')tone(220,180,0.04,'sine',0.04);else if(x==='error')tone(200,90,0.16,'sawtooth',0.07);else if(x==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 
 document.querySelectorAll('.opt[data-n]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-n]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;newGame();});
 document.getElementById('newBtn2').onclick=newGame;
@@ -117,8 +121,11 @@ function buildDOM(){
 }
 function tap(r,c,kind){
   if(!started){started=true;timerIv=setInterval(()=>{timer++;document.getElementById('time').textContent=timer;},1000);}
+  AC();
   cell[r][c]=cell[r][c]===kind?0:kind;
-  if(kind===1&&cell[r][c]===1&&!sol[r][c]){errs++;document.getElementById('err').textContent=errs;}
+  if(kind===1&&cell[r][c]===1&&!sol[r][c]){errs++;document.getElementById('err').textContent=errs;sfx('error');}
+  else if(cell[r][c]===kind)sfx(kind===1?'fill':'cross');
+  else sfx('erase');
   renderCells();checkWin();
 }
 function renderCells(){
@@ -129,7 +136,7 @@ function lineFilled(line){return line.map(v=>v===1?1:0);}
 function checkWin(){
   for(let r=0;r<N;r++)if(clues(lineFilled(cell[r])).join(',')!==rowClues[r].join(','))return;
   for(let c=0;c<N;c++)if(clues(lineFilled(cell.map(row=>row[c]))).join(',')!==colClues[c].join(','))return;
-  clearInterval(timerIv);
+  clearInterval(timerIv); sfx('win');
   document.getElementById('winStats').textContent=t(`${timer}초 · 실수 ${errs}회`,`${timer}s · ${errs} mistakes`);
   document.getElementById('winScreen').classList.remove('hidden');
 }

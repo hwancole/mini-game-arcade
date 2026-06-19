@@ -86,6 +86,10 @@ let history=[];           // 플레이어가 낸 손 기록
 let model=load('rps_model',{o1:{},o2:{}});   // 학습 모델 (order-1, order-2 전이표)
 let record=load('rps_record',{w:0,d:0,l:0,games:0});
 let busy=false;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='throw'){tone(300,300,0.05,'square',0.05);tone(300,300,0.05,'square',0.05,0.16);tone(440,600,0.1,'square',0.07,0.34);}else if(x==='win')[523,659,880].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.09));else if(x==='lose')[392,294,196].forEach((f,i)=>tone(f,f,0.16,'sawtooth',0.09,i*0.1));else if(x==='draw')tone(330,330,0.16,'sine',0.07);}
 
 function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -133,6 +137,7 @@ document.querySelectorAll('.rbtn').forEach(b=>b.onclick=()=>play(+b.dataset.move
 
 function play(myMove){
   if(busy)return; busy=true;
+  AC(); sfx('throw');
   const ai=aiMove();
   // 흔드는 애니메이션
   resultEl.textContent='';resultEl.className='';
@@ -154,9 +159,9 @@ function play(myMove){
 function judge(my,ai){
   const out=(my-ai+3)%3; // 0=무, 1=내가 이김, 2=AI가 이김
   let txt,cls;
-  if(out===0){txt=t('🤝 무승부','🤝 Draw');cls='draw';session.d++;record.d++;}
-  else if(out===1){txt=t('🎉 승리!','🎉 Win!');cls='win';session.w++;record.w++;session.streak++;}
-  else{txt=t('😢 패배','😢 Lose');cls='lose';session.l++;record.l++;session.streak=0;}
+  if(out===0){txt=t('🤝 무승부','🤝 Draw');cls='draw';session.d++;record.d++;sfx('draw');}
+  else if(out===1){txt=t('🎉 승리!','🎉 Win!');cls='win';session.w++;record.w++;session.streak++;sfx('win');}
+  else{txt=t('😢 패배','😢 Lose');cls='lose';session.l++;record.l++;session.streak=0;sfx('lose');}
   record.games++;
   resultEl.textContent=txt;resultEl.className=cls+' show';
   setTimeout(()=>resultEl.classList.remove('show'),400);

@@ -114,6 +114,10 @@ function makePuzzle(){
   given=puzzle.map(r=>r.map(v=>v!==0));
   notes=Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
 }
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.05,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='place')tone(500,650,0.06,'square',0.06);else if(x==='error')tone(220,90,0.18,'sawtooth',0.08);else if(x==='hint'){tone(700,1000,0.1,'square',0.07);tone(1000,1300,0.1,'square',0.06,0.08);}else if(x==='win')[523,659,784,1047,1319].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));}
 function newGame(){
   makePuzzle();sel=-1;errs=0;hints=3;noteMode=false;
   errsEl.textContent=0;hintsEl.textContent=3;
@@ -146,15 +150,16 @@ function input(n){
   if(given[r][c])return;
   if(noteMode&&n!==0){if(notes[r][c].has(n))notes[r][c].delete(n);else notes[r][c].add(n);render();return;}
   if(n===0){puzzle[r][c]=0;render();return;}
-  puzzle[r][c]=n;notes[r][c].clear();
-  if(n!==solution[r][c]){errs++;errsEl.textContent=errs;}
+  AC();puzzle[r][c]=n;notes[r][c].clear();
+  if(n!==solution[r][c]){errs++;errsEl.textContent=errs;sfx('error');}
+  else sfx('place');
   render();checkWin();
 }
 function useHint(){
   if(sel<0||hints<=0)return;const r=Math.floor(sel/9),c=sel%9;
   if(given[r][c]||puzzle[r][c]===solution[r][c])return;
   puzzle[r][c]=solution[r][c];given[r][c]=true;notes[r][c].clear();
-  hints--;hintsEl.textContent=hints;render();checkWin();
+  sfx('hint');hints--;hintsEl.textContent=hints;render();checkWin();
 }
 function checkErrors(){
   for(let i=0;i<81;i++){const r=Math.floor(i/9),c=i%9;
@@ -180,7 +185,7 @@ function render(){
 }
 function checkWin(){
   for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(puzzle[r][c]!==solution[r][c])return;
-  clearInterval(timerIv);
+  clearInterval(timerIv); sfx('win');
   const key='sudoku_best_'+diff,prev=localStorage.getItem(key);let rec='';
   if(!prev||timer<+prev){localStorage.setItem(key,timer);rec=t(' (신기록!)',' (New record!)');}
   document.getElementById('winStats').innerHTML=t(`시간 ${timer}초 · 실수 ${errs}회${rec}`,`Time ${timer}s · ${errs} mistakes${rec}`);
