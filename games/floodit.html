@@ -16,7 +16,7 @@
   .opt.sel{border-color:#ff9f5f;background:rgba(255,159,95,.18)}
   .moves{font-size:1.2rem;font-weight:bold;margin:6px}
   #board{display:grid;gap:0;width:min(92vw,440px);aspect-ratio:1;border-radius:8px;overflow:hidden;touch-action:manipulation}
-  #board div{width:100%;height:100%}
+  #board div{width:100%;height:100%;transition:background .3s ease}
   .palette{display:flex;gap:10px;margin:14px;flex-wrap:wrap;justify-content:center}
   .pal{width:54px;height:54px;border-radius:12px;cursor:pointer;border:3px solid rgba(255,255,255,.25);transition:.1s}
   .pal:active{transform:scale(.9)}
@@ -55,6 +55,11 @@
 const COLORS=['#ff5f6d','#ffd35f','#5fffac','#5fd0ff','#c46fff','#ff9f5f'];
 const boardEl=document.getElementById('board');
 let N=14, board, moves, movesMax, state, cells=[];
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(t){if(t==='flood')tone(360,560,0.12,'sine',0.07);else if(t==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.1));else if(t==='fail')[330,247,165].forEach((f,i)=>tone(f,f,0.18,'sawtooth',0.1,i*0.12));}
+function bestKey(){return 'floodit_best_'+N;}
 
 document.querySelectorAll('.opt[data-n]').forEach(o=>o.onclick=()=>{document.querySelectorAll('.opt[data-n]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');N=+o.dataset.n;start();});
 document.getElementById('newBtn').onclick=start;
@@ -63,7 +68,7 @@ document.getElementById('againBtn').onclick=start;
 function start(){
   board=Array.from({length:N},()=>Array.from({length:N},()=>Math.floor(Math.random()*6)));
   movesMax=Math.round(N*1.7);moves=movesMax;state='play';
-  document.getElementById('movesMax').textContent=movesMax;document.getElementById('movesLeft').textContent=moves;
+  document.getElementById('movesMax').textContent=movesMax;const ml0=document.getElementById('movesLeft');ml0.textContent=moves;ml0.style.color='';
   document.getElementById('endScreen').classList.add('hidden');
   boardEl.style.gridTemplateColumns=`repeat(${N},1fr)`;boardEl.innerHTML='';cells=[];
   for(let i=0;i<N*N;i++){const d=document.createElement('div');boardEl.appendChild(d);cells.push(d);}
@@ -77,20 +82,31 @@ function render(){for(let r=0;r<N;r++)for(let c=0;c<N;c++)cells[r*N+c].style.bac
 function pick(color){
   if(state!=='play')return;
   const old=board[0][0]; if(color===old)return;
-  // BFS flood from (0,0) over old-color region → newColor
-  const st=[[0,0]],seen=new Set(['0,0']);board[0][0]=color;
-  while(st.length){const [r,c]=st.pop();
+  AC(); sfx('flood');
+  // BFS(거리 기록) — 좌상단에서 물결처럼 퍼지는 애니메이션
+  const q=[[0,0,0]],seen=new Set(['0,0']),dist={};board[0][0]=color;
+  while(q.length){const [r,c,d]=q.shift();dist[r*N+c]=d;
     for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const nr=r+dr,nc=c+dc,k=nr+','+nc;
-      if(nr>=0&&nr<N&&nc>=0&&nc<N&&!seen.has(k)&&board[nr][nc]===old){seen.add(k);board[nr][nc]=color;st.push([nr,nc]);}}}
-  moves--;document.getElementById('movesLeft').textContent=moves;render();
+      if(nr>=0&&nr<N&&nc>=0&&nc<N&&!seen.has(k)&&board[nr][nc]===old){seen.add(k);board[nr][nc]=color;q.push([nr,nc,d+1]);}}}
+  for(const key in dist)cells[key].style.transitionDelay=(dist[key]*16)+'ms';
+  render();
+  setTimeout(()=>{for(const key in dist)cells[key].style.transitionDelay='0ms';},500);
+  moves--;const ml=document.getElementById('movesLeft');ml.textContent=moves;ml.style.color=moves<=3?'#ff5f6d':'';
   if(board.every(row=>row.every(v=>v===board[0][0])))return end(true);
   if(moves<=0)return end(false);
 }
 function end(win){
   state='over';
+  sfx(win?'win':'fail');
+  let sub;
+  if(win){ const used=movesMax-moves; const prev=parseInt(localStorage.getItem(bestKey())||'0');
+    const isBest=!prev||used<prev; if(isBest)localStorage.setItem(bestKey(),used);
+    const bestV=isBest?used:prev;
+    sub=t(`${used}번 만에 성공! · 🏆 최소 ${bestV}번${isBest?' 🎉신기록!':''}`,`Done in ${used} moves! · 🏆 Best ${bestV}${isBest?' 🎉New!':''}`);
+  } else sub=t('횟수를 모두 사용했어요.','Out of moves.');
   document.getElementById('endTitle').textContent=win?t('🏆 클리어!','🏆 Cleared!'):t('😢 실패','😢 Failed');
   document.getElementById('endTitle').style.color=win?'#5fffac':'#ff5f6d';
-  document.getElementById('endSub').textContent=win?t(`${movesMax-moves}번 만에 성공!`,`Done in ${movesMax-moves} moves!`):t('횟수를 모두 사용했어요.','Out of moves.');
+  document.getElementById('endSub').textContent=sub;
   document.getElementById('endScreen').classList.remove('hidden');
 }
 start();

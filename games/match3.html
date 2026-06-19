@@ -48,8 +48,21 @@ const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),SIZE=8,CELL=cv.wi
 const scoreEl=document.getElementById('score'),movesEl=document.getElementById('moves'),bestEl=document.getElementById('best');
 const COLORS=['#ff5f6d','#5fd0ff','#ffd35f','#5fffac','#c46fff','#ff9f5f'];
 const GEMS=['🔴','🔷','🟡','🟢','🟣','🟠'];
-let grid,score,movesLeft,state,sel,anim,best;
+let grid,score,movesLeft,state,sel,anim,best,parts=[],pops=[],shake=0,fxRunning=false;
 best=parseInt(localStorage.getItem('match3_best')||'0');bestEl.textContent=best;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(t,combo){if(t==='swap')tone(420,520,0.06,'square',0.05);else if(t==='bad')tone(300,170,0.12,'sawtooth',0.06);else if(t==='match')tone(480+Math.min(combo,8)*70,760+Math.min(combo,8)*70,0.1,'square',0.07);else if(t==='end')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.13,'square',0.09,i*0.1));}
+function burst(x,y,col){for(let i=0;i<6;i++){const a=Math.random()*7;parts.push({x,y,vx:Math.cos(a)*(1+Math.random()*2.5),vy:Math.sin(a)*(1+Math.random()*2.5),life:22,color:col});}}
+function ensureFx(){if(!fxRunning){fxRunning=true;requestAnimationFrame(fxLoop);}}
+function fxLoop(){
+  for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.vy+=0.3;p.life--;} parts=parts.filter(p=>p.life>0);
+  for(const pp of pops){pp.y-=0.5;pp.life--;} pops=pops.filter(pp=>pp.life>0);
+  if(shake>0.3)shake*=0.85;else shake=0;
+  draw();
+  if(parts.length||pops.length||shake>0.3){requestAnimationFrame(fxLoop);}else{fxRunning=false;draw();}
+}
 
 function rc(){return Math.floor(Math.random()*COLORS.length);}
 function makeGrid(){
@@ -67,7 +80,8 @@ function findMatches(){
   return [...m].map(s=>s.split(',').map(Number));
 }
 function start(){
-  makeGrid();score=0;movesLeft=20;state='play';sel=null;
+  AC();
+  makeGrid();score=0;movesLeft=20;state='play';sel=null;parts=[];pops=[];shake=0;
   scoreEl.textContent=0;movesEl.textContent=20;
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('endScreen').classList.add('hidden');
@@ -82,7 +96,8 @@ function adjacent(a,b){return Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1;}
 async function trySwap(a,b){
   if(state!=='play'||!adjacent(a,b))return;
   swap(a,b);
-  if(findMatches().length===0){swap(a,b);sel=null;draw();return;} // no match, revert
+  if(findMatches().length===0){swap(a,b);sel=null;draw();sfx('bad');return;} // no match, revert
+  sfx('swap');
   movesLeft--;movesEl.textContent=movesLeft;sel=null;
   state='resolve';
   await resolve();
@@ -98,6 +113,11 @@ async function resolve(){
     combo++;
     score+=matches.length*10+ (combo-1)*15 + Math.max(0,matches.length-3)*10;
     scoreEl.textContent=score;
+    sfx('match',combo);
+    for(const [r,c] of matches)burst(c*CELL+CELL/2,r*CELL+CELL/2,COLORS[grid[r][c]]);
+    if(matches.length>=5||combo>=2)shake=Math.min(11,4+matches.length);
+    if(combo>1)pops.push({x:cv.width/2,y:cv.height/2,txt:'COMBO x'+combo,life:42});
+    ensureFx();
     for(const [r,c] of matches)grid[r][c]=null;
     draw();await delay(180);
     // gravity
@@ -137,6 +157,8 @@ cv.addEventListener('touchend',e=>{
 
 function draw(){
   ctx.fillStyle='#1a0f2a';ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.save();
+  if(shake>0.3)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
   for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
     const v=grid[r][c];if(v==null)continue;
     const x=c*CELL,y=r*CELL;
@@ -146,10 +168,18 @@ function draw(){
     ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.arc(x+CELL*0.36,y+CELL*0.34,CELL*0.1,0,7);ctx.fill();
     if(sel&&sel.r===r&&sel.c===c){ctx.strokeStyle='#fff';ctx.lineWidth=4;roundRect(x+3,y+3,CELL-6,CELL-6,12);ctx.stroke();}
   }
+  // 매치 파티클
+  for(const p of parts){ctx.globalAlpha=Math.min(1,p.life/22);ctx.fillStyle=p.color;ctx.fillRect(p.x-3,p.y-3,6,6);}
+  ctx.globalAlpha=1;
+  ctx.restore();
+  // 콤보 팝업
+  ctx.font='bold 24px sans-serif';ctx.textAlign='center';ctx.fillStyle='#ffd35f';
+  for(const pp of pops){ctx.globalAlpha=Math.min(1,pp.life/42);ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.strokeText(pp.txt,pp.x,pp.y);ctx.fillText(pp.txt,pp.x,pp.y);}
+  ctx.globalAlpha=1;
 }
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function end(){
-  state='over';
+  state='over'; sfx('end');
   if(score>best){best=score;localStorage.setItem('match3_best',best);bestEl.textContent=best;}
   document.getElementById('endStats').innerHTML=t(`최종 점수: <b>${score}</b><br>최고: ${best}`,`Final Score: <b>${score}</b><br>Best: ${best}`);
   document.getElementById('endScreen').classList.remove('hidden');
