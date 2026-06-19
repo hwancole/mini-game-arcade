@@ -40,6 +40,10 @@ const COLS=7,ROWS=6,CELL=70,PAD=0;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const statusEl=document.getElementById('status');
 let board,turn,over,mode='ai',hoverCol=-1,winCells=[],anim=null;
+// ---- 사운드 ----
+let acx=null;function AC(){if(!acx){try{acx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}return acx;}
+function tone(f,f2,d,ty,v,w){const a=AC();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t0=a.currentTime+(w||0);o.type=ty||'square';o.frequency.setValueAtTime(f,t0);if(f2)o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);g.gain.setValueAtTime(v||0.06,t0);g.gain.exponentialRampToValueAtTime(0.0008,t0+d);o.connect(g);g.connect(a.destination);o.start(t0);o.stop(t0+d);}
+function sfx(x){if(x==='drop')tone(240,120,0.08,'square',0.08);else if(x==='win')[523,659,784,1047].forEach((f,i)=>tone(f,f,0.14,'square',0.09,i*0.1));else if(x==='draw')tone(330,250,0.2,'sine',0.07);}
 
 document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
   document.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');mode=o.dataset.m;reset();});
@@ -60,10 +64,10 @@ function place(c,player,cb){
   anim={c,r,player,y:-CELL,cb};
 }
 function settle(c,r,player){
-  board[r][c]=player;
+  board[r][c]=player; sfx('drop');
   const w=checkWin(r,c,player);
-  if(w){over=true;winCells=w;statusEl.textContent=(player===1?t('🔴 빨강','🔴 Red'):t('🟡 노랑','🟡 Yellow'))+t(' 승리! 🎉',' wins! 🎉');statusEl.style.color=player===1?'#ff5f6d':'#ffd35f';return;}
-  if(board[0].every(v=>v)){over=true;statusEl.textContent=t('무승부!','Draw!');statusEl.style.color='#aaa';return;}
+  if(w){over=true;winCells=w;sfx('win');statusEl.textContent=(player===1?t('🔴 빨강','🔴 Red'):t('🟡 노랑','🟡 Yellow'))+t(' 승리! 🎉',' wins! 🎉');statusEl.style.color=player===1?'#ff5f6d':'#ffd35f';return;}
+  if(board[0].every(v=>v)){over=true;sfx('draw');statusEl.textContent=t('무승부!','Draw!');statusEl.style.color='#aaa';return;}
   turn=3-player;
   statusEl.textContent=turn===1?t('🔴 빨강 차례','🔴 Red\'s turn'):t('🟡 노랑 차례','🟡 Yellow\'s turn');
   statusEl.style.color=turn===1?'#ff5f6d':'#ffd35f';
@@ -141,6 +145,7 @@ function aiMove(){
 cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();hoverCol=Math.floor((e.clientX-r.left)*(cv.width/r.width)/CELL);});
 cv.addEventListener('mouseleave',()=>{hoverCol=-1;});
 cv.addEventListener('click',e=>{
+  AC();
   if(over||anim||(mode==='ai'&&turn===2))return;
   const r=cv.getBoundingClientRect();const c=Math.floor((e.clientX-r.left)*(cv.width/r.width)/CELL);
   if(c>=0&&c<COLS&&dropRow(c)>=0)place(c,turn);
